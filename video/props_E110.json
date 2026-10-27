@@ -1,0 +1,469 @@
+{
+ "postId": "E110",
+ "sceneImage": "posts/E110/scene_9x16.png",
+ "audio": "posts/E110/voice.mp3",
+ "durationSec": 29.044,
+ "headline": "NEW ROLE. TEST AT WORK?",
+ "cta": "Pitch one pilot",
+ "beats": [
+  {
+   "startSec": 0,
+   "text": "NEW ROLE. TEST AT WORK?"
+  },
+  {
+   "startSec": 3.584,
+   "text": "Find one small gap"
+  },
+  {
+   "startSec": 8.498,
+   "text": "Two weeks. One metric."
+  },
+  {
+   "startSec": 12.369,
+   "text": "Set permissions, limits."
+  },
+  {
+   "startSec": 17.664,
+   "text": "Show before / after."
+  },
+  {
+   "startSec": 20.974,
+   "text": "Pitch one pilot."
+  },
+  {
+   "startSec": 25.3,
+   "text": "What will you test?"
+  }
+ ],
+ "captions": [
+  {
+   "text": "Want",
+   "startMs": 256,
+   "endMs": 320,
+   "timestampMs": 288,
+   "confidence": null
+  },
+  {
+   "text": " a",
+   "startMs": 360,
+   "endMs": 400,
+   "timestampMs": 380,
+   "confidence": null
+  },
+  {
+   "text": " marketing",
+   "startMs": 440,
+   "endMs": 800,
+   "timestampMs": 620,
+   "confidence": null
+  },
+  {
+   "text": " role?",
+   "startMs": 864,
+   "endMs": 1680,
+   "timestampMs": 1272,
+   "confidence": null
+  },
+  {
+   "text": " Prove",
+   "startMs": 1820,
+   "endMs": 2320,
+   "timestampMs": 2070,
+   "confidence": null
+  },
+  {
+   "text": " it",
+   "startMs": 2373,
+   "endMs": 2480,
+   "timestampMs": 2426,
+   "confidence": null
+  },
+  {
+   "text": " where",
+   "startMs": 2533,
+   "endMs": 2800,
+   "timestampMs": 2666,
+   "confidence": null
+  },
+  {
+   "text": " you",
+   "startMs": 2860,
+   "endMs": 3040,
+   "timestampMs": 2950,
+   "confidence": null
+  },
+  {
+   "text": " are.",
+   "startMs": 3100,
+   "endMs": 3360,
+   "timestampMs": 3230,
+   "confidence": null
+  },
+  {
+   "text": " Pick",
+   "startMs": 3584,
+   "endMs": 4480,
+   "timestampMs": 4032,
+   "confidence": null
+  },
+  {
+   "text": " one",
+   "startMs": 4560,
+   "endMs": 4800,
+   "timestampMs": 4680,
+   "confidence": null
+  },
+  {
+   "text": " customer",
+   "startMs": 4844,
+   "endMs": 5200,
+   "timestampMs": 5022,
+   "confidence": null
+  },
+  {
+   "text": " gap.",
+   "startMs": 5280,
+   "endMs": 5840,
+   "timestampMs": 5560,
+   "confidence": null
+  },
+  {
+   "text": " Like",
+   "startMs": 5904,
+   "endMs": 6160,
+   "timestampMs": 6032,
+   "confidence": null
+  },
+  {
+   "text": " slow",
+   "startMs": 6240,
+   "endMs": 6560,
+   "timestampMs": 6400,
+   "confidence": null
+  },
+  {
+   "text": " WhatsApp",
+   "startMs": 6604,
+   "endMs": 6960,
+   "timestampMs": 6782,
+   "confidence": null
+  },
+  {
+   "text": " replies.",
+   "startMs": 7030,
+   "endMs": 7600,
+   "timestampMs": 7315,
+   "confidence": null
+  },
+  {
+   "text": " Propose",
+   "startMs": 8498,
+   "endMs": 8802,
+   "timestampMs": 8650,
+   "confidence": null
+  },
+  {
+   "text": " two",
+   "startMs": 8862,
+   "endMs": 9042,
+   "timestampMs": 8952,
+   "confidence": null
+  },
+  {
+   "text": " weeks,",
+   "startMs": 9095,
+   "endMs": 9842,
+   "timestampMs": 9468,
+   "confidence": null
+  },
+  {
+   "text": " one",
+   "startMs": 9882,
+   "endMs": 10002,
+   "timestampMs": 9942,
+   "confidence": null
+  },
+  {
+   "text": " deliverable,",
+   "startMs": 10052,
+   "endMs": 11122,
+   "timestampMs": 10587,
+   "confidence": null
+  },
+  {
+   "text": " one",
+   "startMs": 11162,
+   "endMs": 11282,
+   "timestampMs": 11222,
+   "confidence": null
+  },
+  {
+   "text": " metric.",
+   "startMs": 11351,
+   "endMs": 12282,
+   "timestampMs": 11817,
+   "confidence": null
+  },
+  {
+   "text": " Agree",
+   "startMs": 12369,
+   "endMs": 12802,
+   "timestampMs": 12586,
+   "confidence": null
+  },
+  {
+   "text": " permissions",
+   "startMs": 12855,
+   "endMs": 13442,
+   "timestampMs": 13148,
+   "confidence": null
+  },
+  {
+   "text": " and",
+   "startMs": 13482,
+   "endMs": 13602,
+   "timestampMs": 13542,
+   "confidence": null
+  },
+  {
+   "text": " data",
+   "startMs": 13666,
+   "endMs": 13922,
+   "timestampMs": 13794,
+   "confidence": null
+  },
+  {
+   "text": " limits.",
+   "startMs": 13979,
+   "endMs": 14402,
+   "timestampMs": 14190,
+   "confidence": null
+  },
+  {
+   "text": " Keep",
+   "startMs": 14530,
+   "endMs": 15042,
+   "timestampMs": 14786,
+   "confidence": null
+  },
+  {
+   "text": " it",
+   "startMs": 15069,
+   "endMs": 15122,
+   "timestampMs": 15096,
+   "confidence": null
+  },
+  {
+   "text": " scoped",
+   "startMs": 15202,
+   "endMs": 15682,
+   "timestampMs": 15442,
+   "confidence": null
+  },
+  {
+   "text": " and",
+   "startMs": 15762,
+   "endMs": 16002,
+   "timestampMs": 15882,
+   "confidence": null
+  },
+  {
+   "text": " safe.",
+   "startMs": 16082,
+   "endMs": 16482,
+   "timestampMs": 16282,
+   "confidence": null
+  },
+  {
+   "text": " Share",
+   "startMs": 17664,
+   "endMs": 17764,
+   "timestampMs": 17714,
+   "confidence": null
+  },
+  {
+   "text": " a",
+   "startMs": 17844,
+   "endMs": 17924,
+   "timestampMs": 17884,
+   "confidence": null
+  },
+  {
+   "text": " before",
+   "startMs": 17981,
+   "endMs": 18324,
+   "timestampMs": 18153,
+   "confidence": null
+  },
+  {
+   "text": " and",
+   "startMs": 18364,
+   "endMs": 18484,
+   "timestampMs": 18424,
+   "confidence": null
+  },
+  {
+   "text": " after",
+   "startMs": 18537,
+   "endMs": 18804,
+   "timestampMs": 18670,
+   "confidence": null
+  },
+  {
+   "text": " note,",
+   "startMs": 18868,
+   "endMs": 19204,
+   "timestampMs": 19036,
+   "confidence": null
+  },
+  {
+   "text": " plus",
+   "startMs": 19300,
+   "endMs": 19684,
+   "timestampMs": 19492,
+   "confidence": null
+  },
+  {
+   "text": " next",
+   "startMs": 19748,
+   "endMs": 20004,
+   "timestampMs": 19876,
+   "confidence": null
+  },
+  {
+   "text": " step.",
+   "startMs": 20068,
+   "endMs": 20844,
+   "timestampMs": 20456,
+   "confidence": null
+  },
+  {
+   "text": " Now",
+   "startMs": 20974,
+   "endMs": 21364,
+   "timestampMs": 21169,
+   "confidence": null
+  },
+  {
+   "text": " pitch",
+   "startMs": 21417,
+   "endMs": 21684,
+   "timestampMs": 21550,
+   "confidence": null
+  },
+  {
+   "text": " one",
+   "startMs": 21744,
+   "endMs": 21924,
+   "timestampMs": 21834,
+   "confidence": null
+  },
+  {
+   "text": " pilot.",
+   "startMs": 22004,
+   "endMs": 22804,
+   "timestampMs": 22404,
+   "confidence": null
+  },
+  {
+   "text": " You",
+   "startMs": 22904,
+   "endMs": 23204,
+   "timestampMs": 23054,
+   "confidence": null
+  },
+  {
+   "text": " show",
+   "startMs": 23252,
+   "endMs": 23444,
+   "timestampMs": 23348,
+   "confidence": null
+  },
+  {
+   "text": " judgment,",
+   "startMs": 23506,
+   "endMs": 24244,
+   "timestampMs": 23875,
+   "confidence": null
+  },
+  {
+   "text": " not",
+   "startMs": 24304,
+   "endMs": 24484,
+   "timestampMs": 24394,
+   "confidence": null
+  },
+  {
+   "text": " tools.",
+   "startMs": 24551,
+   "endMs": 25044,
+   "timestampMs": 24798,
+   "confidence": null
+  },
+  {
+   "text": " What",
+   "startMs": 25300,
+   "endMs": 26324,
+   "timestampMs": 25812,
+   "confidence": null
+  },
+  {
+   "text": " two-week",
+   "startMs": 26384,
+   "endMs": 26804,
+   "timestampMs": 26594,
+   "confidence": null
+  },
+  {
+   "text": " pilot",
+   "startMs": 26871,
+   "endMs": 27204,
+   "timestampMs": 27038,
+   "confidence": null
+  },
+  {
+   "text": " could",
+   "startMs": 27244,
+   "endMs": 27444,
+   "timestampMs": 27344,
+   "confidence": null
+  },
+  {
+   "text": " you",
+   "startMs": 27464,
+   "endMs": 27524,
+   "timestampMs": 27494,
+   "confidence": null
+  },
+  {
+   "text": " try",
+   "startMs": 27624,
+   "endMs": 27924,
+   "timestampMs": 27774,
+   "confidence": null
+  },
+  {
+   "text": " at",
+   "startMs": 28004,
+   "endMs": 28164,
+   "timestampMs": 28084,
+   "confidence": null
+  },
+  {
+   "text": " your",
+   "startMs": 28196,
+   "endMs": 28324,
+   "timestampMs": 28260,
+   "confidence": null
+  },
+  {
+   "text": " workplace?",
+   "startMs": 28380,
+   "endMs": 29044,
+   "timestampMs": 28712,
+   "confidence": null
+  }
+ ],
+ "producer": "Quantum Weave",
+ "seriesLabel": "AI. NOW WHAT?"
+}

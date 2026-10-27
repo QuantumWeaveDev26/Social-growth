@@ -1,0 +1,904 @@
+{
+ "audio": "bm/day1/voice.mp3",
+ "durationSec": 51.76,
+ "scenes": [
+  {
+   "startSec": 0,
+   "title": "MORE AI TOOLS?",
+   "kind": "image",
+   "image": "bm/day1/shot1.png"
+  },
+  {
+   "startSec": 4.6,
+   "title": "TOOLS CAN'T FIX BROKEN HANDOFFS",
+   "kind": "cards",
+   "image": "bm/day1/shot1.png",
+   "items": [
+    "New enquiry|No owner",
+    "Follow-up|Not sent",
+    "Process|Unclear"
+   ],
+   "itemTimes": [
+    6.48,
+    10.08,
+    13.92
+   ]
+  },
+  {
+   "startSec": 16.6,
+   "title": "MAP THE WORKFLOW FIRST",
+   "kind": "flow",
+   "items": [
+    "Enquiry arrives",
+    "Acknowledged",
+    "Assigned to an owner",
+    "Followed up",
+    "Outcome recorded"
+   ],
+   "itemTimes": [
+    16.8,
+    19.36,
+    20.36,
+    21.08,
+    22.08
+   ]
+  },
+  {
+   "startSec": 23.52,
+   "title": "SIMPLIFY \u2192 CONNECT \u2192 MEASURE",
+   "kind": "chips",
+   "image": "bm/day1/shot4.png",
+   "items": [
+    "Simplify",
+    "Connect",
+    "Measure"
+   ],
+   "itemTimes": [
+    23.62,
+    25.6,
+    36.4
+   ]
+  },
+  {
+   "startSec": 37.76,
+   "title": "BETTER SYSTEMS. BETTER GROWTH.",
+   "kind": "image",
+   "image": "bm/day1/shot5.png"
+  },
+  {
+   "startSec": 49.84,
+   "title": "",
+   "kind": "endcard"
+  }
+ ],
+ "captions": [
+  {
+   "text": "Are",
+   "startMs": 0,
+   "endMs": 160,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " you",
+   "startMs": 200,
+   "endMs": 240,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " collecting",
+   "startMs": 320,
+   "endMs": 880,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " AI",
+   "startMs": 960,
+   "endMs": 1280,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " tools,",
+   "startMs": 1360,
+   "endMs": 2000,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " or",
+   "startMs": 2120,
+   "endMs": 2240,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " building",
+   "startMs": 2400,
+   "endMs": 2640,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " a",
+   "startMs": 2720,
+   "endMs": 2800,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " business",
+   "startMs": 2880,
+   "endMs": 3280,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " that",
+   "startMs": 3360,
+   "endMs": 3440,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " works",
+   "startMs": 3600,
+   "endMs": 3760,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " better?",
+   "startMs": 3920,
+   "endMs": 4560,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " A",
+   "startMs": 4600,
+   "endMs": 4640,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " new",
+   "startMs": 4720,
+   "endMs": 4800,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " chatbot",
+   "startMs": 4960,
+   "endMs": 5520,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " cannot",
+   "startMs": 5600,
+   "endMs": 6000,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " fix",
+   "startMs": 6080,
+   "endMs": 6320,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " an",
+   "startMs": 6360,
+   "endMs": 6400,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " enquiry",
+   "startMs": 6480,
+   "endMs": 6960,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " nobody",
+   "startMs": 7120,
+   "endMs": 7520,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " owns.",
+   "startMs": 7600,
+   "endMs": 8280,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " A",
+   "startMs": 8480,
+   "endMs": 8640,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " dashboard",
+   "startMs": 8960,
+   "endMs": 9280,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " cannot",
+   "startMs": 9360,
+   "endMs": 9680,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " fix",
+   "startMs": 9760,
+   "endMs": 9840,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " a",
+   "startMs": 9920,
+   "endMs": 10000,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " follow-up",
+   "startMs": 10080,
+   "endMs": 10560,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " nobody",
+   "startMs": 10640,
+   "endMs": 11040,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " sends.",
+   "startMs": 11080,
+   "endMs": 12000,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " And",
+   "startMs": 12080,
+   "endMs": 12160,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " automation",
+   "startMs": 12240,
+   "endMs": 12880,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " cannot",
+   "startMs": 12960,
+   "endMs": 13360,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " repair",
+   "startMs": 13440,
+   "endMs": 13760,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " a",
+   "startMs": 13800,
+   "endMs": 13840,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " process",
+   "startMs": 13920,
+   "endMs": 14480,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " nobody",
+   "startMs": 14640,
+   "endMs": 15120,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " understands.",
+   "startMs": 15280,
+   "endMs": 16400,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " Start",
+   "startMs": 16600,
+   "endMs": 16800,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " with",
+   "startMs": 16880,
+   "endMs": 16960,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " an",
+   "startMs": 17040,
+   "endMs": 17200,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " outcome:",
+   "startMs": 17480,
+   "endMs": 18160,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " every",
+   "startMs": 18240,
+   "endMs": 18560,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " enquiry",
+   "startMs": 18640,
+   "endMs": 19120,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " gets",
+   "startMs": 19200,
+   "endMs": 19280,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " acknowledged,",
+   "startMs": 19360,
+   "endMs": 20080,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " assigned,",
+   "startMs": 20360,
+   "endMs": 20720,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " and",
+   "startMs": 20800,
+   "endMs": 20960,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " followed",
+   "startMs": 21080,
+   "endMs": 21280,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " up.",
+   "startMs": 21360,
+   "endMs": 22000,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " Map",
+   "startMs": 22080,
+   "endMs": 22320,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " those",
+   "startMs": 22440,
+   "endMs": 22560,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " steps.",
+   "startMs": 22640,
+   "endMs": 23440,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " Remove",
+   "startMs": 23520,
+   "endMs": 24000,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " what",
+   "startMs": 24080,
+   "endMs": 24160,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " is",
+   "startMs": 24200,
+   "endMs": 24240,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " unnecessary.",
+   "startMs": 24320,
+   "endMs": 25520,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " Then",
+   "startMs": 25600,
+   "endMs": 26000,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " connect",
+   "startMs": 26240,
+   "endMs": 26480,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " only",
+   "startMs": 26640,
+   "endMs": 26800,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " the",
+   "startMs": 26880,
+   "endMs": 26960,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " tools",
+   "startMs": 27160,
+   "endMs": 27360,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " that",
+   "startMs": 27480,
+   "endMs": 27600,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " genuinely",
+   "startMs": 27680,
+   "endMs": 28240,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " help.",
+   "startMs": 28320,
+   "endMs": 28960,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " This",
+   "startMs": 29040,
+   "endMs": 29360,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " is",
+   "startMs": 29440,
+   "endMs": 29520,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " the",
+   "startMs": 29600,
+   "endMs": 29760,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " systems-first",
+   "startMs": 30000,
+   "endMs": 30560,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " approach",
+   "startMs": 30720,
+   "endMs": 31040,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " at",
+   "startMs": 31120,
+   "endMs": 31200,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " BrandMint",
+   "startMs": 31360,
+   "endMs": 31680,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " AI:",
+   "startMs": 31840,
+   "endMs": 32640,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " understand",
+   "startMs": 32720,
+   "endMs": 33280,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " the",
+   "startMs": 33320,
+   "endMs": 33360,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " business",
+   "startMs": 33440,
+   "endMs": 33760,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " problem,",
+   "startMs": 34000,
+   "endMs": 34480,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " design",
+   "startMs": 34560,
+   "endMs": 34960,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " the",
+   "startMs": 35000,
+   "endMs": 35040,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " right",
+   "startMs": 35120,
+   "endMs": 35280,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " workflow,",
+   "startMs": 35360,
+   "endMs": 36160,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " and",
+   "startMs": 36240,
+   "endMs": 36320,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " measure",
+   "startMs": 36400,
+   "endMs": 36720,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " the",
+   "startMs": 36760,
+   "endMs": 36800,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " result.",
+   "startMs": 37040,
+   "endMs": 37680,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " Before",
+   "startMs": 37760,
+   "endMs": 38080,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " buying",
+   "startMs": 38160,
+   "endMs": 38400,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " another",
+   "startMs": 38560,
+   "endMs": 38720,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " subscription,",
+   "startMs": 39080,
+   "endMs": 39680,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " write",
+   "startMs": 39760,
+   "endMs": 40000,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " down",
+   "startMs": 40160,
+   "endMs": 40320,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " one",
+   "startMs": 40400,
+   "endMs": 40640,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " business",
+   "startMs": 40840,
+   "endMs": 41040,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " process",
+   "startMs": 41280,
+   "endMs": 41520,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " that",
+   "startMs": 41640,
+   "endMs": 41760,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " keeps",
+   "startMs": 41800,
+   "endMs": 42080,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " breaking.",
+   "startMs": 42160,
+   "endMs": 43080,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " Because",
+   "startMs": 43120,
+   "endMs": 43360,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " sustainable",
+   "startMs": 43547,
+   "endMs": 43920,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " growth",
+   "startMs": 44000,
+   "endMs": 44400,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " does",
+   "startMs": 44520,
+   "endMs": 44640,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " not",
+   "startMs": 44800,
+   "endMs": 44960,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " come",
+   "startMs": 45080,
+   "endMs": 45200,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " from",
+   "startMs": 45280,
+   "endMs": 45440,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " stacking",
+   "startMs": 45520,
+   "endMs": 45920,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " more",
+   "startMs": 46040,
+   "endMs": 46160,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " tools.",
+   "startMs": 46560,
+   "endMs": 47000,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " It",
+   "startMs": 47040,
+   "endMs": 47120,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " comes",
+   "startMs": 47200,
+   "endMs": 47520,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " from",
+   "startMs": 47600,
+   "endMs": 47840,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " building",
+   "startMs": 48080,
+   "endMs": 48320,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " better",
+   "startMs": 48480,
+   "endMs": 48640,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " systems.",
+   "startMs": 49160,
+   "endMs": 49760,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " Which",
+   "startMs": 49840,
+   "endMs": 49920,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " process",
+   "startMs": 50000,
+   "endMs": 50400,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " would",
+   "startMs": 50480,
+   "endMs": 50560,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " you",
+   "startMs": 50640,
+   "endMs": 50800,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " fix",
+   "startMs": 50920,
+   "endMs": 51040,
+   "timestampMs": null,
+   "confidence": null
+  },
+  {
+   "text": " first?",
+   "startMs": 51120,
+   "endMs": 51760,
+   "timestampMs": null,
+   "confidence": null
+  }
+ ],
+ "brandName": "BrandMint AI",
+ "endLine": "Which process would you fix first?"
+}

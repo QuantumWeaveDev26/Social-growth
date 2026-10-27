@@ -1,0 +1,427 @@
+{
+ "postId": "E111",
+ "sceneImage": "posts/E111/scene_9x16.png",
+ "audio": "posts/E111/voice.mp3",
+ "durationSec": 28.403,
+ "headline": "WATCHED THE TUTORIAL. LEARNED?",
+ "cta": "Replicate one result",
+ "beats": [
+  {
+   "startSec": 0,
+   "text": "WATCHED THE TUTORIAL. LEARNED?"
+  },
+  {
+   "startSec": 2.827,
+   "text": "Rebuild it. On your data."
+  },
+  {
+   "startSec": 4.864,
+   "text": "Pick one. Real product."
+  },
+  {
+   "startSec": 7.907,
+   "text": "Write three differences."
+  },
+  {
+   "startSec": 11.88,
+   "text": "One before/after metric."
+  },
+  {
+   "startSec": 17.36,
+   "text": "Note: what I changed."
+  },
+  {
+   "startSec": 21.963,
+   "text": "Replicate one result."
+  }
+ ],
+ "captions": [
+  {
+   "text": "Watched",
+   "startMs": 253,
+   "endMs": 400,
+   "timestampMs": 326,
+   "confidence": null
+  },
+  {
+   "text": " it.",
+   "startMs": 453,
+   "endMs": 640,
+   "timestampMs": 546,
+   "confidence": null
+  },
+  {
+   "text": " But",
+   "startMs": 780,
+   "endMs": 1200,
+   "timestampMs": 990,
+   "confidence": null
+  },
+  {
+   "text": " did",
+   "startMs": 1240,
+   "endMs": 1360,
+   "timestampMs": 1300,
+   "confidence": null
+  },
+  {
+   "text": " you",
+   "startMs": 1400,
+   "endMs": 1520,
+   "timestampMs": 1460,
+   "confidence": null
+  },
+  {
+   "text": " learn?",
+   "startMs": 1573,
+   "endMs": 2240,
+   "timestampMs": 1906,
+   "confidence": null
+  },
+  {
+   "text": " Rebuild",
+   "startMs": 2827,
+   "endMs": 3120,
+   "timestampMs": 2974,
+   "confidence": null
+  },
+  {
+   "text": " it",
+   "startMs": 3173,
+   "endMs": 3280,
+   "timestampMs": 3226,
+   "confidence": null
+  },
+  {
+   "text": " on",
+   "startMs": 3387,
+   "endMs": 3600,
+   "timestampMs": 3494,
+   "confidence": null
+  },
+  {
+   "text": " your",
+   "startMs": 3680,
+   "endMs": 4000,
+   "timestampMs": 3840,
+   "confidence": null
+  },
+  {
+   "text": " data.",
+   "startMs": 4096,
+   "endMs": 4800,
+   "timestampMs": 4448,
+   "confidence": null
+  },
+  {
+   "text": " Pick",
+   "startMs": 4864,
+   "endMs": 5120,
+   "timestampMs": 4992,
+   "confidence": null
+  },
+  {
+   "text": " one",
+   "startMs": 5220,
+   "endMs": 5520,
+   "timestampMs": 5370,
+   "confidence": null
+  },
+  {
+   "text": " tutorial",
+   "startMs": 5582,
+   "endMs": 6080,
+   "timestampMs": 5831,
+   "confidence": null
+  },
+  {
+   "text": " and",
+   "startMs": 6180,
+   "endMs": 6480,
+   "timestampMs": 6330,
+   "confidence": null
+  },
+  {
+   "text": " one",
+   "startMs": 6580,
+   "endMs": 6880,
+   "timestampMs": 6730,
+   "confidence": null
+  },
+  {
+   "text": " product.",
+   "startMs": 6980,
+   "endMs": 7760,
+   "timestampMs": 7370,
+   "confidence": null
+  },
+  {
+   "text": " Write",
+   "startMs": 7907,
+   "endMs": 8640,
+   "timestampMs": 8274,
+   "confidence": null
+  },
+  {
+   "text": " three",
+   "startMs": 8693,
+   "endMs": 8960,
+   "timestampMs": 8826,
+   "confidence": null
+  },
+  {
+   "text": " differences",
+   "startMs": 9013,
+   "endMs": 9600,
+   "timestampMs": 9306,
+   "confidence": null
+  },
+  {
+   "text": " you",
+   "startMs": 9640,
+   "endMs": 9760,
+   "timestampMs": 9700,
+   "confidence": null
+  },
+  {
+   "text": " chose.",
+   "startMs": 9840,
+   "endMs": 10600,
+   "timestampMs": 10220,
+   "confidence": null
+  },
+  {
+   "text": " That's",
+   "startMs": 10672,
+   "endMs": 11040,
+   "timestampMs": 10856,
+   "confidence": null
+  },
+  {
+   "text": " judgment.",
+   "startMs": 11102,
+   "endMs": 11680,
+   "timestampMs": 11391,
+   "confidence": null
+  },
+  {
+   "text": " Add",
+   "startMs": 11880,
+   "endMs": 12480,
+   "timestampMs": 12180,
+   "confidence": null
+  },
+  {
+   "text": " one",
+   "startMs": 12560,
+   "endMs": 12800,
+   "timestampMs": 12680,
+   "confidence": null
+  },
+  {
+   "text": " before",
+   "startMs": 12880,
+   "endMs": 13360,
+   "timestampMs": 13120,
+   "confidence": null
+  },
+  {
+   "text": " and",
+   "startMs": 13420,
+   "endMs": 13600,
+   "timestampMs": 13510,
+   "confidence": null
+  },
+  {
+   "text": " after",
+   "startMs": 13667,
+   "endMs": 14000,
+   "timestampMs": 13834,
+   "confidence": null
+  },
+  {
+   "text": " metric.",
+   "startMs": 14091,
+   "endMs": 14800,
+   "timestampMs": 14446,
+   "confidence": null
+  },
+  {
+   "text": " Replies",
+   "startMs": 14940,
+   "endMs": 15920,
+   "timestampMs": 15430,
+   "confidence": null
+  },
+  {
+   "text": " or",
+   "startMs": 16027,
+   "endMs": 16240,
+   "timestampMs": 16133,
+   "confidence": null
+  },
+  {
+   "text": " reply",
+   "startMs": 16307,
+   "endMs": 16640,
+   "timestampMs": 16474,
+   "confidence": null
+  },
+  {
+   "text": " time.",
+   "startMs": 16720,
+   "endMs": 17120,
+   "timestampMs": 16920,
+   "confidence": null
+  },
+  {
+   "text": " End",
+   "startMs": 17360,
+   "endMs": 18080,
+   "timestampMs": 17720,
+   "confidence": null
+  },
+  {
+   "text": " with",
+   "startMs": 18144,
+   "endMs": 18400,
+   "timestampMs": 18272,
+   "confidence": null
+  },
+  {
+   "text": " three",
+   "startMs": 18453,
+   "endMs": 18720,
+   "timestampMs": 18586,
+   "confidence": null
+  },
+  {
+   "text": " sentences:",
+   "startMs": 18792,
+   "endMs": 19600,
+   "timestampMs": 19196,
+   "confidence": null
+  },
+  {
+   "text": " what",
+   "startMs": 19744,
+   "endMs": 20320,
+   "timestampMs": 20032,
+   "confidence": null
+  },
+  {
+   "text": " I",
+   "startMs": 20360,
+   "endMs": 20400,
+   "timestampMs": 20380,
+   "confidence": null
+  },
+  {
+   "text": " changed.",
+   "startMs": 20480,
+   "endMs": 21120,
+   "timestampMs": 20800,
+   "confidence": null
+  },
+  {
+   "text": " Replicate",
+   "startMs": 21963,
+   "endMs": 22483,
+   "timestampMs": 22223,
+   "confidence": null
+  },
+  {
+   "text": " one",
+   "startMs": 22583,
+   "endMs": 22883,
+   "timestampMs": 22733,
+   "confidence": null
+  },
+  {
+   "text": " result",
+   "startMs": 22963,
+   "endMs": 23443,
+   "timestampMs": 23203,
+   "confidence": null
+  },
+  {
+   "text": " this",
+   "startMs": 23491,
+   "endMs": 23683,
+   "timestampMs": 23587,
+   "confidence": null
+  },
+  {
+   "text": " week.",
+   "startMs": 23763,
+   "endMs": 24163,
+   "timestampMs": 23963,
+   "confidence": null
+  },
+  {
+   "text": " Which",
+   "startMs": 24296,
+   "endMs": 24963,
+   "timestampMs": 24630,
+   "confidence": null
+  },
+  {
+   "text": " tutorial",
+   "startMs": 25043,
+   "endMs": 25683,
+   "timestampMs": 25363,
+   "confidence": null
+  },
+  {
+   "text": " will",
+   "startMs": 25747,
+   "endMs": 26003,
+   "timestampMs": 25875,
+   "confidence": null
+  },
+  {
+   "text": " you",
+   "startMs": 26063,
+   "endMs": 26243,
+   "timestampMs": 26153,
+   "confidence": null
+  },
+  {
+   "text": " rebuild",
+   "startMs": 26323,
+   "endMs": 26883,
+   "timestampMs": 26603,
+   "confidence": null
+  },
+  {
+   "text": " on",
+   "startMs": 26990,
+   "endMs": 27203,
+   "timestampMs": 27096,
+   "confidence": null
+  },
+  {
+   "text": " your",
+   "startMs": 27251,
+   "endMs": 27443,
+   "timestampMs": 27347,
+   "confidence": null
+  },
+  {
+   "text": " own",
+   "startMs": 27523,
+   "endMs": 27763,
+   "timestampMs": 27643,
+   "confidence": null
+  },
+  {
+   "text": " data?",
+   "startMs": 27859,
+   "endMs": 28403,
+   "timestampMs": 28131,
+   "confidence": null
+  }
+ ],
+ "producer": "Quantum Weave",
+ "seriesLabel": "AI. NOW WHAT?"
+}
