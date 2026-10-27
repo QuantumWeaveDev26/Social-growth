@@ -1,0 +1,13 @@
+node_modules/
+.next/
+.env
+*.db
+*.db-shm
+*.db-wal
+storage/
+out/
+web/e2e/
+web/.claude/
+web/tsconfig.tsbuildinfo
+video/public/job/
+*.log

@@ -1,0 +1,44 @@
+# Deployed on the Hostinger VPS behind the n8n Traefik proxy.
+# APP_HOST, AUTH_SECRET, AI_GATEWAY_KEY etc. come from the project environment.
+name: brandmint
+x-app: &app
+  build:
+    context: https://github.com/QuantumWeaveDev26/Social-growth.git#main
+  image: brandmint-studio:latest
+  pull_policy: build
+  restart: unless-stopped
+  env_file: .env
+  environment:
+    APP_URL: https://${APP_HOST}
+  volumes:
+    - brandmint-data:/data
+
+services:
+  web:
+    <<: *app
+    command: ["web"]
+    networks: [ingress]
+    mem_limit: 1536m
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: n8n_default
+      traefik.http.routers.brandmint.rule: "Host(`${APP_HOST}`)"
+      traefik.http.routers.brandmint.entrypoints: websecure
+      traefik.http.routers.brandmint.tls: "true"
+      traefik.http.routers.brandmint.tls.certresolver: mytlschallenge
+      traefik.http.services.brandmint.loadbalancer.server.port: "3000"
+  worker:
+    <<: *app
+    command: ["worker"]
+    pull_policy: never
+    depends_on: [web]
+    mem_limit: 3g
+    networks: [ingress]
+
+volumes:
+  brandmint-data:
+
+networks:
+  ingress:
+    external: true
+    name: n8n_default

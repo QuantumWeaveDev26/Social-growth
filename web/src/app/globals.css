@@ -1,0 +1,104 @@
+@import "tailwindcss";
+@import "@fontsource/figtree/400.css";
+@import "@fontsource/figtree/500.css";
+@import "@fontsource/figtree/600.css";
+@import "@fontsource/figtree/700.css";
+@import "@fontsource/bricolage-grotesque/500.css";
+@import "@fontsource/bricolage-grotesque/700.css";
+@import "@fontsource/bricolage-grotesque/800.css";
+
+/* BrandMint AI — "calm studio" proof-sheet system */
+@theme {
+  --color-paper: #f4f6f5;        /* porcelain ground */
+  --color-sheet: #fbfcfb;        /* raised sheet */
+  --color-line: #dde3e0;         /* hairlines */
+  --color-line-strong: #c4ccc8;
+  --color-ink: #13221d;          /* deep ink-green */
+  --color-ink-2: #3e4f49;        /* secondary text, 8.9:1 on paper */
+  --color-ink-3: #5d6d67;        /* tertiary, 5.2:1 on paper */
+  --color-rail: #13221d;
+  --color-rail-2: #1c2f28;
+  --color-rail-text: #c9d6d1;
+  --color-mint: #1f9d74;         /* accent: approve */
+  --color-mint-deep: #157a59;    /* accent text on paper, 5.3:1 */
+  --color-mint-wash: #e3f2ec;
+  --color-amber: #c77a12;        /* changes requested */
+  --color-amber-deep: #8f560a;
+  --color-amber-wash: #faefdc;
+  --color-red: #b3392f;
+  --color-red-wash: #f8e4e1;
+
+  --font-sans: "Figtree", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Bricolage Grotesque", "Figtree", ui-sans-serif, sans-serif;
+
+  --shadow-sheet: 0 1px 2px rgb(19 34 29 / 0.06), 0 6px 20px -8px rgb(19 34 29 / 0.14);
+  --shadow-lift: 0 2px 4px rgb(19 34 29 / 0.06), 0 18px 40px -16px rgb(19 34 29 / 0.28);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html { color-scheme: light; }
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01";
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: color-mix(in oklab, var(--color-mint) 28%, white); color: var(--color-ink); }
+input, textarea { caret-color: var(--color-mint-deep); }
+:focus-visible { outline: 2px solid var(--color-mint); outline-offset: 2px; border-radius: 6px; }
+a { text-underline-offset: 3px; text-decoration-thickness: 1px; }
+
+* { scrollbar-width: thin; scrollbar-color: var(--color-line-strong) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb { background: var(--color-line-strong); border-radius: 10px; border: 3px solid var(--color-paper); }
+
+.tnum { font-variant-numeric: tabular-nums; }
+h1, h2, h3 { text-wrap: balance; }
+p { text-wrap: pretty; }
+
+/* Form controls */
+.field {
+  width: 100%; background: white; border: 1px solid var(--color-line-strong); border-radius: 10px;
+  padding: 0.65rem 0.8rem; font-size: 0.95rem; color: var(--color-ink);
+  transition: border-color 160ms, box-shadow 160ms;
+}
+.field::placeholder { color: var(--color-ink-3); }
+.field:hover { border-color: var(--color-ink-3); }
+.field:focus { outline: none; border-color: var(--color-mint); box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-mint) 22%, transparent); }
+.label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.4rem; color: var(--color-ink); }
+.hint { font-size: 0.8rem; color: var(--color-ink-3); margin-top: 0.35rem; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+  border-radius: 10px; padding: 0.62rem 1.05rem; font-weight: 600; font-size: 0.92rem;
+  transition: background-color 160ms, color 160ms, box-shadow 160ms, transform 160ms var(--ease-out-expo);
+  cursor: pointer; white-space: nowrap;
+}
+.btn:active { transform: translateY(1px); }
+.btn:disabled, .btn[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; transform: none; }
+.btn-primary { background: var(--color-ink); color: white; }
+.btn-primary:hover:not(:disabled) { background: var(--color-rail-2); box-shadow: var(--shadow-sheet); }
+.btn-mint { background: var(--color-mint); color: white; }
+.btn-mint:hover:not(:disabled) { background: var(--color-mint-deep); }
+.btn-ghost { background: transparent; color: var(--color-ink); border: 1px solid var(--color-line-strong); }
+.btn-ghost:hover:not(:disabled) { background: white; border-color: var(--color-ink-3); }
+.btn-amber { background: var(--color-amber-wash); color: var(--color-amber-deep); border: 1px solid color-mix(in oklab, var(--color-amber) 40%, transparent); }
+.btn-amber:hover:not(:disabled) { background: color-mix(in oklab, var(--color-amber) 22%, white); }
+
+/* Status chips */
+.chip { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.74rem; font-weight: 600; padding: 0.18rem 0.55rem; border-radius: 999px; white-space: nowrap; }
+
+/* The one authored moment: the grease-pencil approval stroke */
+.approve-mark path { stroke-dasharray: 120; stroke-dashoffset: 0; }
+.approve-mark.draw path { animation: pencil 620ms var(--ease-out-expo) both; }
+@keyframes pencil { from { stroke-dashoffset: 120; } to { stroke-dashoffset: 0; } }
+
+/* Generating shimmer for frames still in the darkroom */
+.developing { background: linear-gradient(100deg, #e9eeec 30%, #f4f7f6 50%, #e9eeec 70%); background-size: 300% 100%; animation: develop 2.2s linear infinite; }
+@keyframes develop { from { background-position: 100% 0; } to { background-position: -200% 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .approve-mark.draw path, .developing { animation: none; }
+}

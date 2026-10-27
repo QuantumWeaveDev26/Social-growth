@@ -1,0 +1,10 @@
+**/node_modules
+**/.next
+**/.env
+**/*.db*
+web/storage
+web/e2e
+web/.claude
+video/out
+video/public/job
+.git
