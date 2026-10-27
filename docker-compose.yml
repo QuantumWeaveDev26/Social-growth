@@ -7,9 +7,28 @@ x-app: &app
   image: brandmint-studio:latest
   pull_policy: build
   restart: unless-stopped
-  env_file: .env
   environment:
     APP_URL: https://${APP_HOST}
+    AUTH_SECRET: ${AUTH_SECRET:-}
+    TOKEN_KEY: ${TOKEN_KEY:-}
+    ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+    ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+    AI_GATEWAY_URL: ${AI_GATEWAY_URL:-}
+    AI_GATEWAY_KEY: ${AI_GATEWAY_KEY:-}
+    AI_TEXT_MODEL: ${AI_TEXT_MODEL:-}
+    AI_PLAN_MODEL: ${AI_PLAN_MODEL:-}
+    AI_IMAGE_MODEL: ${AI_IMAGE_MODEL:-}
+    TTS_VOICE_ID: ${TTS_VOICE_ID:-}
+    TTS_MODEL: ${TTS_MODEL:-}
+    WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-}
+    RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+    RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+    META_APP_ID: ${META_APP_ID:-}
+    META_APP_SECRET: ${META_APP_SECRET:-}
+    META_GRAPH_VERSION: ${META_GRAPH_VERSION:-}
+    META_LOGIN_CONFIG_ID: ${META_LOGIN_CONFIG_ID:-}
+    INSTAGRAM_APP_ID: ${INSTAGRAM_APP_ID:-}
+    INSTAGRAM_APP_SECRET: ${INSTAGRAM_APP_SECRET:-}
   volumes:
     - brandmint-data:/data
 
