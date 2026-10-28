@@ -34,6 +34,7 @@ export default async function Admin() {
   const jobs = db.select().from(schema.jobs).where(sql`${schema.jobs.status} = 'failed'`).orderBy(desc(schema.jobs.finishedAt)).limit(40).all();
   const running = db.select({ n: sql<number>`count(*)` }).from(schema.jobs).where(sql`${schema.jobs.status} = 'running' or (${schema.jobs.status} = 'queued' and ${schema.jobs.runAt} <= ${Date.now()})`).get()?.n ?? 0;
   const names = new Map(customers.map((c) => [c.id, c.businessName]));
+  const owned = new Set(db.select({ c: schema.users.customerId }).from(schema.users).all().map((u) => u.c));
   const mrr = [...subs.values()].filter((s) => s.status === "active").reduce((a, s) => a + (plans.get(s.planId)?.priceInr ?? 0), 0);
   const totalCost = [...stats.values()].reduce((a, s) => a + (s.cost || 0), 0);
   const items = db.select({ n: sql<number>`count(*)` }).from(schema.contentItems).where(sql`${schema.contentItems.thumbPath} is not null`).get()?.n ?? 0;
@@ -65,7 +66,7 @@ export default async function Admin() {
                 const s = stats.get(c.id); const sub = subs.get(c.id); const conn = conns.get(c.id);
                 return (
                   <tr key={c.id} className="hover:bg-white">
-                    <td className="px-4 py-3 font-semibold"><Link href={`/admin/customers/${c.id}`} className="hover:text-mint-deep hover:underline">{c.businessName}</Link><span className="block text-xs font-normal text-ink-3">{fmtDateTime(c.createdAt)}</span></td>
+                    <td className="px-4 py-3 font-semibold"><Link href={`/admin/customers/${c.id}`} className="hover:text-mint-deep hover:underline">{c.businessName}</Link>{!owned.has(c.id) && <span className="chip ml-2 bg-amber-wash text-amber-deep">No login</span>}<span className="block text-xs font-normal text-ink-3">{fmtDateTime(c.createdAt)}</span></td>
                     <td className="px-4 py-3">{sub ? `${plans.get(sub.planId)?.name} (${sub.provider})` : "—"}</td>
                     <td className="px-4 py-3 capitalize">{c.status}{c.status === "onboarding" ? ` · step ${c.onboardStep}` : ""}</td>
                     <td className="px-4 py-3">{conn ? `@${conn.igUsername}${conn.mode === "demo" ? " (demo)" : ""}` : "—"}</td>

@@ -56,3 +56,7 @@ The server builds this repo straight from GitHub (`docker-compose.yml`), behind 
 - Data (SQLite database and media) lives in the `brandmint-data` volume, mounted at `/data`
 - Required project environment: `APP_HOST`, `AUTH_SECRET`, `TOKEN_KEY`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `AI_GATEWAY_URL`, `AI_GATEWAY_KEY`, plus the AI, Meta and Razorpay variables from `web/.env.example`
 - To ship an update: push to `main`, then redeploy the `brandmint` project (it rebuilds from GitHub)
+
+### Database changes
+
+`drizzle-kit push` runs only when the database file doesn't exist yet. Existing databases are upgraded by the additive migrations in `web/src/db/index.ts` (`migrate()`): add every new column or table there as `alter table … add column` / `create table if not exists`. Never run `drizzle-kit push --force` against a live database; it can empty tables. The web container also copies the database to `/data/pre-start-backup.db` on every start, and the worker keeps 7 nightly backups in `/data/backups`.

@@ -9,7 +9,7 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { daysLeft } from "@/lib/billing";
 import { currentMonth, nextMonth, fmtDateTime, inr, monthLabel } from "@/lib/format";
 import { mediaUrl } from "@/lib/storage";
-import { adminChangePlan, adminExtend, adminSetStatus, adminRetryFailed, adminReleaseHeld, adminPlanMonth, adminRebuildProfile } from "./actions";
+import { adminChangePlan, adminExtend, adminSetStatus, adminRetryFailed, adminReleaseHeld, adminPlanMonth, adminRebuildProfile, adminAttachOwner } from "./actions";
 
 export const metadata = { title: "Customer" };
 export const dynamic = "force-dynamic";
@@ -51,6 +51,16 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
             <SubmitButton className="btn btn-ghost" pending="Saving">{c.status === "paused" ? "Resume customer" : "Pause customer"}</SubmitButton>
           </form>
         </div>
+
+        {!owner && (
+          <form action={adminAttachOwner} className="mt-6 flex flex-wrap items-end gap-3 rounded-[14px] bg-amber-wash p-5">
+            <Hidden />
+            <p className="w-full text-sm text-amber-deep"><span className="font-semibold">This business has no login.</span> Add the owner’s email and we’ll email them a link to set a password. Their content and settings stay as they are.</p>
+            <div><label className="label" htmlFor="o-name">Owner name</label><input id="o-name" name="name" className="field w-56" /></div>
+            <div><label className="label" htmlFor="o-email">Owner email</label><input id="o-email" name="email" type="email" required className="field w-72" /></div>
+            <SubmitButton pending="Sending">Create login and email link</SubmitButton>
+          </form>
+        )}
 
         <div className="mt-8 grid grid-cols-3 gap-8">
           <section className="rounded-[14px] bg-sheet p-5 ring-1 ring-line">

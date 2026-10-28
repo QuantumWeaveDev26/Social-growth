@@ -6,6 +6,8 @@ import { requireAdmin } from "@/lib/auth";
 import { applyPayment } from "@/lib/billing";
 import { enqueue } from "@/lib/jobs";
 import { notify } from "@/lib/notify";
+import crypto from "node:crypto";
+import { hashPassword } from "@/lib/auth";
 
 const back = (id: string) => revalidatePath(`/admin/customers/${id}`);
 
@@ -74,5 +76,26 @@ export async function adminRebuildProfile(fd: FormData) {
   await requireAdmin();
   const id = String(fd.get("customerId"));
   enqueue("brand_profile", { customerId: id }, { customerId: id });
+  back(id);
+}
+
+/** Gives an orphaned business a login again and emails the owner a link to set their password. */
+export async function adminAttachOwner(fd: FormData) {
+  await requireAdmin();
+  const id = String(fd.get("customerId"));
+  const email = String(fd.get("email") || "").trim().toLowerCase();
+  const name = String(fd.get("name") || "").trim() || email.split("@")[0];
+  if (!email.includes("@")) return;
+  const existing = db.select().from(schema.users).where(eq(schema.users.email, email)).get();
+  let userId = existing?.id;
+  if (existing) db.update(schema.users).set({ customerId: id }).where(eq(schema.users.id, existing.id)).run();
+  else userId = db.insert(schema.users).values({ email, name, customerId: id, passwordHash: await hashPassword(crypto.randomBytes(24).toString("hex")) }).returning().get().id;
+  const token = crypto.randomBytes(32).toString("base64url");
+  db.insert(schema.passwordResets).values({ userId: userId!, tokenHash: crypto.createHash("sha256").update(token).digest("hex"), expiresAt: new Date(Date.now() + 72 * 3600e3) }).run();
+  notify(null, {
+    kind: "password_reset", email: true, link: `/reset?token=${token}`, cta: "Set my password",
+    title: "Set a password for BrandMint AI",
+    body: "Your BrandMint AI account is ready for you. Choose a password to sign in. Everything you set up earlier is still there.\n\nThis link works for 3 days and only once.",
+  }, userId);
   back(id);
 }
