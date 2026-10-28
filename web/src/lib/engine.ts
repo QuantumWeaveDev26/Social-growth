@@ -14,6 +14,8 @@ import { saveFile, absPath, STORAGE_ROOT } from "./storage";
 import { enqueue, type StepFn } from "./jobs";
 import { publishToMeta, platformsFor, MetaError, checkConnection, refreshInstagramToken } from "./meta";
 import { seal, open as openSecret } from "./crypto";
+import { notify } from "./notify";
+import { monthLabel } from "./format";
 
 const run = promisify(execFile);
 const PB_DIR = path.join(process.cwd(), "src/playbooks/saas");
@@ -165,6 +167,34 @@ async function withLogo(png: Buffer, logoFile: string | null) {
 }
 
 export async function generateItem(itemId: string, step: StepFn = () => {}) {
+  await makeItem(itemId, step);
+  afterItemMade(itemId);
+}
+
+/** Tells the customer when their month (or a remade item) is ready to review. */
+function afterItemMade(itemId: string) {
+  const item = db.select().from(schema.contentItems).where(eq(schema.contentItems.id, itemId)).get();
+  if (!item || item.status !== "awaiting_approval") return;
+  const plan = db.select().from(schema.contentPlans).where(eq(schema.contentPlans.id, item.planId)).get();
+  if (item.revisionCount > 0) {
+    notify(item.customerId, { kind: "month_ready", title: "Your change is ready", body: "We remade the post with your note. Have a look and approve it if it’s right.", link: `/app/items/${item.id}`, dedupeKey: `redo:${item.id}:${item.revisionCount}` });
+    return;
+  }
+  const still = db.select({ id: schema.contentItems.id }).from(schema.contentItems)
+    .where(and(eq(schema.contentItems.planId, item.planId), inArray(schema.contentItems.status, ["planned", "generating", "changes_requested"]))).all().length;
+  if (still > 0) return;
+  const ready = db.select({ id: schema.contentItems.id }).from(schema.contentItems)
+    .where(and(eq(schema.contentItems.planId, item.planId), eq(schema.contentItems.status, "awaiting_approval"))).all().length;
+  const month = plan ? monthLabel(plan.month) : "this month";
+  notify(item.customerId, {
+    kind: "month_ready", email: true, dedupeKey: `month_ready:${item.planId}`, link: plan ? `/app?month=${plan.month}&show=review` : "/app",
+    title: `Your ${month} posts are ready to review`,
+    body: `${ready} posts and reels for ${month} are on your proof sheet.\n\nTick the ones you like and leave a note on any you want changed. Nothing goes live until you approve it.`,
+    cta: "Review my month",
+  });
+}
+
+async function makeItem(itemId: string, step: StepFn = () => {}) {
   const item = db.select().from(schema.contentItems).where(eq(schema.contentItems.id, itemId)).get();
   if (!item) throw new Error("item not found");
   const profile = latestProfile(item.customerId);
@@ -340,6 +370,7 @@ export async function publishDue() {
         db.insert(schema.publishJobs).values({ itemId: item.id, platform, scheduledAt: item.slotAt, status: "failed", error: err.message.slice(0, 500) }).run();
         if (err.needsReconnect) {
           db.update(schema.metaConnections).set({ status: "needs_reconnect", lastError: err.message.slice(0, 300), lastCheckedAt: new Date() }).where(eq(schema.metaConnections.id, conn.id)).run();
+          connectionBroken(conn.customerId, conn.id, err.message);
           blocked.add(item.customerId);
           break;
         }
@@ -352,6 +383,11 @@ export async function publishDue() {
     db.update(schema.contentItems)
       .set({ status: ok ? "published" : "failed", error: ok ? null : `Posting failed: ${lastErr ?? "unknown error"}` })
       .where(eq(schema.contentItems.id, item.id)).run();
+    if (!ok) notify(item.customerId, {
+      kind: "post_failed", email: true, dedupeKey: `post_failed:${item.id}`, link: `/app/items/${item.id}`,
+      title: "A scheduled post couldn’t go out",
+      body: `Meta rejected one of today’s posts: ${lastErr ?? "unknown error"}.\n\nOpen it to see the details. You can ask us to remake it.`, cta: "See the post",
+    });
   }
 }
 
@@ -374,6 +410,16 @@ export async function syncConnections() {
       db.update(schema.metaConnections)
         .set({ lastCheckedAt: new Date(), lastError: err.message.slice(0, 300), ...(err.needsReconnect ? { status: "needs_reconnect" } : {}) })
         .where(eq(schema.metaConnections.id, c.id)).run();
+      if (err.needsReconnect) connectionBroken(c.customerId, c.id, err.message);
     }
   }
+}
+
+function connectionBroken(customerId: string, connId: string, reason: string) {
+  notify(customerId, {
+    kind: "connection_broken", email: true, dedupeKey: `conn_broken:${connId}:${new Date().toISOString().slice(0, 10)}`, link: "/app/settings",
+    title: "Reconnect Facebook and Instagram",
+    body: `Meta stopped accepting our access to your accounts (${reason}). This usually happens after a password change or when a permission is removed.\n\nYour approved posts are safe and waiting. Reconnect and they go out on schedule.`,
+    cta: "Reconnect now",
+  });
 }

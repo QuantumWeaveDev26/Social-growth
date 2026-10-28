@@ -11,6 +11,7 @@ export const users = sqliteTable("users", {
   passwordHash: text("password_hash").notNull(),
   role: text("role").notNull().default("owner"), // owner | admin
   customerId: text("customer_id"),
+  sessionVersion: integer("session_version").notNull().default(0), // bump to sign out every session
   createdAt: now("created_at"),
 });
 
@@ -43,7 +44,7 @@ export const subscriptions = sqliteTable("subscriptions", {
   id: id(),
   customerId: text("customer_id").notNull().unique(),
   planId: text("plan_id").notNull(),
-  status: text("status").notNull().default("pending"), // pending | active | cancelled
+  status: text("status").notNull().default("pending"), // pending | active | past_due | cancelled
   provider: text("provider").notNull().default("demo"), // razorpay | demo
   orderId: text("order_id"),
   paymentId: text("payment_id"),
@@ -167,3 +168,53 @@ export const workers = sqliteTable("workers", {
 export type Customer = typeof customers.$inferSelect;
 export type ContentItem = typeof contentItems.$inferSelect;
 export type Plan = typeof plans.$inferSelect;
+
+/** In-app notifications; email is sent by the worker when emailStatus = "pending". */
+export const notifications = sqliteTable(
+  "notifications",
+  {
+    id: id(),
+    customerId: text("customer_id"),
+    userId: text("user_id"), // set for account emails (password reset)
+    kind: text("kind").notNull(), // month_ready | approvals_due | connection_broken | post_failed | renewal_due | renewed | past_due | password_reset | welcome
+    dedupeKey: text("dedupe_key"), // one notification per key
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    link: text("link"),
+    emailStatus: text("email_status").notNull().default("none"), // none | pending | sent | failed
+    emailError: text("email_error"),
+    readAt: integer("read_at", { mode: "timestamp_ms" }),
+    createdAt: now("created_at"),
+  },
+  (t) => [uniqueIndex("notifications_dedupe").on(t.dedupeKey)],
+);
+
+export const passwordResets = sqliteTable("password_resets", {
+  id: id(),
+  userId: text("user_id").notNull(),
+  tokenHash: text("token_hash").notNull().unique(),
+  expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+  usedAt: integer("used_at", { mode: "timestamp_ms" }),
+  createdAt: now("created_at"),
+});
+
+/** Billing history: one row per paid (or demo) period. */
+export const payments = sqliteTable("payments", {
+  id: id(),
+  customerId: text("customer_id").notNull(),
+  planId: text("plan_id").notNull(),
+  amountInr: integer("amount_inr").notNull(),
+  provider: text("provider").notNull(), // razorpay | demo | admin
+  orderId: text("order_id"),
+  paymentId: text("payment_id"),
+  status: text("status").notNull().default("paid"), // created | paid | failed
+  periodStart: integer("period_start", { mode: "timestamp_ms" }),
+  periodEnd: integer("period_end", { mode: "timestamp_ms" }),
+  createdAt: now("created_at"),
+});
+
+/** Small key/value store for scheduler bookkeeping. */
+export const kv = sqliteTable("kv", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+});

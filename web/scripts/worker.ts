@@ -7,6 +7,8 @@ import crypto from "node:crypto";
 import { claimNext, finishJob, stepper } from "../src/lib/jobs";
 import { buildBrandProfile, planMonth, generateItem, publishDue, syncConnections } from "../src/lib/engine";
 import { db, schema } from "../src/db";
+import { deliverNotification } from "../src/lib/notify";
+import { runDaily } from "../src/lib/cycle";
 import { eq } from "drizzle-orm";
 
 const CONCURRENCY = Number(process.env.WORKER_CONCURRENCY || 3);
@@ -20,6 +22,7 @@ async function handle(job: NonNullable<ReturnType<typeof claimNext>>) {
     else if (job.type === "plan_month") await planMonth(p.customerId, p.month, step);
     else if (job.type === "generate_item") await generateItem(p.itemId, step);
     else if (job.type === "publish_due") await publishDue();
+    else if (job.type === "send_email") await deliverNotification(p.notificationId, p.cta);
     finishJob(job.id);
     console.log(new Date().toISOString(), "done", job.type, job.id);
   } catch (e) {
@@ -58,6 +61,11 @@ setInterval(tick, 1500);
 const sync = () => syncConnections().catch((e) => console.error("connection sync error", e));
 sync();
 setInterval(sync, 30 * 60_000);
+
+// daily housekeeping (billing, next month, approvals digest, backups)
+const daily = () => runDaily().catch((e) => console.error("daily error", e));
+setTimeout(daily, 20_000);
+setInterval(daily, 10 * 60_000);
 
 // heartbeat: lets the app show whether the worker is alive and how busy it is
 const WORKER_ID = crypto.randomUUID();

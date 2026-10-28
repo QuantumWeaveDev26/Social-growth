@@ -1,11 +1,14 @@
 "use server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull, lt } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { requireCustomer } from "@/lib/auth";
+import { requireCustomer, checkPassword, hashPassword, createSession } from "@/lib/auth";
 import { enqueue } from "@/lib/jobs";
 import { currentMonth, nextMonth } from "@/lib/format";
+
+/** An approval that arrives after the planned time posts in about 10 minutes instead of never. */
+const catchUp = (slot: Date) => (slot.getTime() < Date.now() + 5 * 60_000 ? new Date(Date.now() + 10 * 60_000) : slot);
 
 async function ownItem(itemId: string) {
   const { customer } = await requireCustomer();
@@ -18,7 +21,7 @@ export async function approveItem(fd: FormData) {
   const itemId = String(fd.get("itemId"));
   const { item } = await ownItem(itemId);
   if (item.status !== "awaiting_approval") redirect(`/app/items/${itemId}`);
-  db.update(schema.contentItems).set({ status: "scheduled", updatedAt: new Date() }).where(eq(schema.contentItems.id, itemId)).run();
+  db.update(schema.contentItems).set({ status: "scheduled", updatedAt: new Date(), slotAt: catchUp(item.slotAt) }).where(eq(schema.contentItems.id, itemId)).run();
   db.insert(schema.approvals).values({ itemId, decision: "approved" }).run();
   revalidatePath("/app");
   const next = String(fd.get("next") || "");
@@ -52,6 +55,9 @@ export async function approveAllReady(fd: FormData) {
     .where(and(eq(schema.contentItems.customerId, customer.id), eq(schema.contentItems.planId, planId), eq(schema.contentItems.status, "awaiting_approval"))).all();
   if (ready.length) {
     db.update(schema.contentItems).set({ status: "scheduled", updatedAt: new Date() }).where(inArray(schema.contentItems.id, ready.map((r) => r.id))).run();
+    // anything whose time already passed goes out over the next hour, 15 minutes apart
+    const late = db.select().from(schema.contentItems).where(and(inArray(schema.contentItems.id, ready.map((r) => r.id)), lt(schema.contentItems.slotAt, new Date(Date.now() + 5 * 60_000)))).orderBy(schema.contentItems.slotAt).all();
+    late.forEach((it, i) => db.update(schema.contentItems).set({ slotAt: new Date(Date.now() + (10 + i * 15) * 60_000) }).where(eq(schema.contentItems.id, it.id)).run());
     db.insert(schema.approvals).values(ready.map((r) => ({ itemId: r.id, decision: "approved" }))).run();
   }
   revalidatePath("/app");
@@ -117,4 +123,23 @@ export async function checkMeta() {
     db.update(schema.metaConnections).set({ lastError: e.message, lastCheckedAt: new Date(), ...(e.needsReconnect ? { status: "needs_reconnect" } : {}) }).where(eq(schema.metaConnections.id, conn.id)).run();
     redirect("/app/settings");
   }
+}
+
+export async function markAllRead() {
+  const { customer } = await requireCustomer();
+  db.update(schema.notifications).set({ readAt: new Date() }).where(and(eq(schema.notifications.customerId, customer.id), isNull(schema.notifications.readAt))).run();
+  revalidatePath("/app", "layout");
+}
+
+export type PasswordState = { error?: string; ok?: boolean } | undefined;
+export async function changePassword(_: PasswordState, fd: FormData): Promise<PasswordState> {
+  const { user } = await requireCustomer();
+  const current = String(fd.get("current") || "");
+  const next = String(fd.get("next") || "");
+  if (!(await checkPassword(current, user.passwordHash))) return { error: "Your current password isn’t right." };
+  if (next.length < 8) return { error: "Use at least 8 characters for the new password." };
+  if (next === current) return { error: "Pick a password you haven’t used here before." };
+  db.update(schema.users).set({ passwordHash: await hashPassword(next), sessionVersion: user.sessionVersion + 1 }).where(eq(schema.users.id, user.id)).run();
+  await createSession(user.id);
+  return { ok: true };
 }

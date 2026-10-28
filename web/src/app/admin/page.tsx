@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { desc, sql } from "drizzle-orm";
 import { RotateCcw } from "lucide-react";
 import { db, schema } from "@/db";
@@ -64,7 +65,7 @@ export default async function Admin() {
                 const s = stats.get(c.id); const sub = subs.get(c.id); const conn = conns.get(c.id);
                 return (
                   <tr key={c.id} className="hover:bg-white">
-                    <td className="px-4 py-3 font-semibold">{c.businessName}<span className="block text-xs font-normal text-ink-3">{fmtDateTime(c.createdAt)}</span></td>
+                    <td className="px-4 py-3 font-semibold"><Link href={`/admin/customers/${c.id}`} className="hover:text-mint-deep hover:underline">{c.businessName}</Link><span className="block text-xs font-normal text-ink-3">{fmtDateTime(c.createdAt)}</span></td>
                     <td className="px-4 py-3">{sub ? `${plans.get(sub.planId)?.name} (${sub.provider})` : "—"}</td>
                     <td className="px-4 py-3 capitalize">{c.status}{c.status === "onboarding" ? ` · step ${c.onboardStep}` : ""}</td>
                     <td className="px-4 py-3">{conn ? `@${conn.igUsername}${conn.mode === "demo" ? " (demo)" : ""}` : "—"}</td>

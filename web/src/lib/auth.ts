@@ -10,7 +10,8 @@ const COOKIE = "bm_session";
 const secret = () => new TextEncoder().encode(process.env.AUTH_SECRET || "dev-secret");
 
 export async function createSession(userId: string) {
-  const token = await new SignJWT({ sub: userId })
+  const u = db.select({ sv: schema.users.sessionVersion }).from(schema.users).where(eq(schema.users.id, userId)).get();
+  const token = await new SignJWT({ sub: userId, sv: u?.sv ?? 0 })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("30d")
@@ -28,7 +29,9 @@ export async function currentUser() {
   try {
     const { payload } = await jwtVerify(token, secret());
     const user = db.select().from(schema.users).where(eq(schema.users.id, String(payload.sub))).get();
-    return user ?? null;
+    // a password change bumps sessionVersion and signs out every older session
+    if (!user || (payload.sv ?? 0) !== user.sessionVersion) return null;
+    return user;
   } catch {
     return null;
   }

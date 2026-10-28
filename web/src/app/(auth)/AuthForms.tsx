@@ -13,7 +13,10 @@ export function SignInForm() {
       <p className="text-ink-2">Sign in to review this month’s proof sheet.</p>
       <FormError message={state?.error} />
       <div><label className="label" htmlFor="email">Email</label><input id="email" name="email" type="email" autoComplete="email" required className="field" /></div>
-      <div><label className="label" htmlFor="password">Password</label><input id="password" name="password" type="password" autoComplete="current-password" required className="field" /></div>
+      <div>
+        <div className="flex items-baseline justify-between"><label className="label" htmlFor="password">Password</label><Link href="/forgot" className="text-sm font-medium text-mint-deep underline">Forgot password?</Link></div>
+        <input id="password" name="password" type="password" autoComplete="current-password" required className="field" />
+      </div>
       <SubmitButton className="btn btn-primary w-full py-3" pending="Signing in">Sign in</SubmitButton>
       <p className="text-sm text-ink-2">New to BrandMint AI? <Link href="/signup" className="font-semibold text-mint-deep underline">Start your month</Link></p>
     </form>

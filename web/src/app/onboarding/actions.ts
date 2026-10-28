@@ -9,6 +9,7 @@ import { enqueue } from "@/lib/jobs";
 import { saveFile } from "@/lib/storage";
 import { createOrder, razorpayLive, verifySignature } from "@/lib/razorpay";
 import { currentMonth, nextMonth } from "@/lib/format";
+import { applyPayment } from "@/lib/billing";
 
 export type StepState = { error?: string; order?: { id: string; amount: number; key: string; name: string; email: string } } | undefined;
 
@@ -16,12 +17,7 @@ const setStep = (customerId: string, step: number) =>
   db.update(schema.customers).set({ onboardStep: step }).where(eq(schema.customers.id, customerId)).run();
 
 function activateSubscription(customerId: string, planId: string, provider: "razorpay" | "demo", orderId?: string, paymentId?: string) {
-  const start = new Date();
-  const end = new Date(start.getTime() + 30 * 86400e3);
-  const values = { customerId, planId, status: "active", provider, orderId: orderId ?? null, paymentId: paymentId ?? null, periodStart: start, periodEnd: end };
-  const existing = db.select().from(schema.subscriptions).where(eq(schema.subscriptions.customerId, customerId)).get();
-  if (existing) db.update(schema.subscriptions).set(values).where(eq(schema.subscriptions.id, existing.id)).run();
-  else db.insert(schema.subscriptions).values(values).run();
+  applyPayment(customerId, planId, provider, { orderId, paymentId });
 }
 
 /** Step 1: plan + payment */
@@ -30,6 +26,13 @@ export async function choosePlan(_: StepState, fd: FormData): Promise<StepState>
   const planId = String(fd.get("plan") || "");
   const plan = db.select().from(schema.plans).where(eq(schema.plans.id, planId)).get();
   if (!plan) return { error: "Choose a plan to continue." };
+  const current = db.select().from(schema.subscriptions).where(eq(schema.subscriptions.customerId, customer.id)).get();
+  if (current?.status === "active") {
+    // already paid for this period: just switch the plan
+    db.update(schema.subscriptions).set({ planId: plan.id }).where(eq(schema.subscriptions.id, current.id)).run();
+    setStep(customer.id, Math.max(customer.onboardStep, 2));
+    redirect("/onboarding");
+  }
   if (!razorpayLive()) {
     activateSubscription(customer.id, plan.id, "demo");
     setStep(customer.id, 2);

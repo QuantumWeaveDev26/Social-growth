@@ -1,7 +1,7 @@
 import { and, asc, eq, lte } from "drizzle-orm";
 import { db, schema } from "@/db";
 
-export type JobType = "brand_profile" | "plan_month" | "generate_item" | "publish_due";
+export type JobType = "brand_profile" | "plan_month" | "generate_item" | "publish_due" | "send_email";
 
 export function enqueue(type: JobType, payload: Record<string, unknown>, opts: { customerId?: string; runAt?: Date } = {}) {
   return db

@@ -14,7 +14,7 @@ const MESSAGES: Record<string, { tone: "ok" | "warn" | "err"; text: string }> = 
   error: { tone: "err", text: "Meta didn’t complete the connection. Try again. If it keeps failing, check that your Instagram is a Business or Creator account." },
 };
 
-/** The connect / status card used in onboarding and in Accounts and plan. */
+/** The connect / status card used in onboarding and in Connections. */
 export function MetaConnect({ conn, message, after, disconnect, check }: {
   conn: Conn; message?: string;
   after?: () => Promise<void>; disconnect?: () => Promise<void>; check?: () => Promise<void>;

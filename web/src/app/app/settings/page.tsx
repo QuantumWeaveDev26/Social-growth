@@ -6,7 +6,7 @@ import { fmtDateTime, inr } from "@/lib/format";
 import { MetaConnect } from "@/components/MetaConnect";
 import { disconnectMeta, saveSettings, checkMeta } from "../actions";
 
-export const metadata = { title: "Accounts and plan" };
+export const metadata = { title: "Connections" };
 
 export default async function Settings({ searchParams }: { searchParams: Promise<{ saved?: string; meta?: string }> }) {
   const sp = await searchParams;
@@ -19,7 +19,7 @@ export default async function Settings({ searchParams }: { searchParams: Promise
   return (
     <main className="px-12 pb-20 pt-10">
       <header className="border-b border-line pb-6">
-        <h1 className="font-display text-[2.3rem] leading-none tracking-[-0.03em]" style={{ fontWeight: 800 }}>Accounts and plan</h1>
+        <h1 className="font-display text-[2.3rem] leading-none tracking-[-0.03em]" style={{ fontWeight: 800 }}>Connections</h1>
         <p className="mt-3 text-ink-2">Signed in as {user.email}</p>
       </header>
       <div className="max-w-[820px] divide-y divide-line">
@@ -31,17 +31,8 @@ export default async function Settings({ searchParams }: { searchParams: Promise
         </section>
 
         <section className="grid grid-cols-[220px_1fr] gap-10 py-9">
-          <div><h2 className="font-bold">Plan</h2><p className="mt-1 text-sm text-ink-2">Billed monthly.</p></div>
-          <div className="tnum">
-            {plan && sub ? (
-              <dl className="grid grid-cols-[140px_1fr] gap-y-2 text-[0.95rem]">
-                <dt className="text-ink-2">Plan</dt><dd className="font-semibold">{plan.name} · {inr(plan.priceInr)}/month</dd>
-                <dt className="text-ink-2">Each month</dt><dd>{plan.posts} posts, {plan.reels} reels, {plan.revisions} revisions per item</dd>
-                <dt className="text-ink-2">Current period</dt><dd>{sub.periodStart && sub.periodEnd ? `${fmtDateTime(sub.periodStart).split(",").slice(0, 2).join(",")} to ${fmtDateTime(sub.periodEnd).split(",").slice(0, 2).join(",")}` : "Not started"}</dd>
-                <dt className="text-ink-2">Payment</dt><dd>{sub.provider === "demo" ? "Demo (no charge)" : `Razorpay · ${sub.paymentId}`}</dd>
-              </dl>
-            ) : <p className="text-ink-2">No active plan.</p>}
-          </div>
+          <div><h2 className="font-bold">Plan</h2><p className="mt-1 text-sm text-ink-2">Billed every 30 days.</p></div>
+          <p className="text-ink-2">{plan ? `${plan.name} · ${plan.posts} posts and ${plan.reels} reels a month.` : "No active plan."} <a href="/app/billing" className="font-semibold text-mint-deep underline">Billing and renewals</a></p>
         </section>
 
         <form action={saveSettings} className="grid grid-cols-[220px_1fr] gap-10 py-9">
