@@ -4,7 +4,8 @@ import { and, asc, desc, eq, gt, sql } from "drizzle-orm";
 import { ArrowLeft } from "lucide-react";
 import { db, schema } from "@/db";
 import { requireAdmin } from "@/lib/auth";
-import { Wordmark, StatusChip } from "@/components/ui";
+import { StatusChip } from "@/components/ui";
+import { AdminShell } from "../../AdminShell";
 import { SubmitButton } from "@/components/SubmitButton";
 import { daysLeft } from "@/lib/billing";
 import { currentMonth, nextMonth, fmtDateTime, inr, monthLabel } from "@/lib/format";
@@ -38,10 +39,10 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
   const Hidden = () => <input type="hidden" name="customerId" value={id} />;
 
   return (
-    <div className="min-h-dvh">
-      <header className="flex items-center gap-4 bg-rail px-10 py-4 text-rail-text"><Wordmark dark href="/admin" /><span className="text-sm">Operations</span></header>
-      <main className="px-10 pb-20 pt-8">
-        <Link href="/admin" className="flex items-center gap-1.5 text-sm font-medium text-ink-2 hover:text-ink"><ArrowLeft className="size-4" aria-hidden />All customers</Link>
+    <AdminShell active="clients">
+
+
+        <Link href="/admin/customers" className="flex items-center gap-1.5 text-sm font-medium text-ink-2 hover:text-ink"><ArrowLeft className="size-4" aria-hidden />All clients</Link>
         <div className="mt-4 flex items-end justify-between gap-6 border-b border-line pb-6">
           <div>
             <h1 className="font-display text-[2.2rem] leading-none tracking-[-0.03em]" style={{ fontWeight: 800 }}>{c.businessName}</h1>
@@ -142,7 +143,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
           ))}
           {!notices.length && <li className="py-4 text-ink-2">None yet.</li>}
         </ul>
-      </main>
-    </div>
+    </AdminShell>
+
   );
 }

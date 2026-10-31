@@ -1,132 +1,125 @@
 import Link from "next/link";
-import { desc, sql } from "drizzle-orm";
-import { RotateCcw } from "lucide-react";
+import { and, asc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireAdmin } from "@/lib/auth";
-import { Wordmark } from "@/components/ui";
-import { ActivityPanel } from "@/components/ActivityPanel";
-import { getActivity } from "@/lib/activity";
-import { fmtDateTime, inr } from "@/lib/format";
-import { signOut } from "../(auth)/actions";
-import { retryJob, setCustomerStatus, toggleGeneration } from "./actions";
+import { fmtDateTime, fmtTime, inr } from "@/lib/format";
 import { generationPaused } from "@/lib/jobs";
+import { getActivity } from "@/lib/activity";
+import { clientRows } from "@/lib/adminData";
+import { toggleGeneration } from "./actions";
+import { AdminShell } from "./AdminShell";
+import { IssueChips } from "./ui";
 
 export const metadata = { title: "Admin" };
 export const dynamic = "force-dynamic";
 
 const usd = (n: number) => `$${n.toFixed(2)}`;
 
-export default async function Admin() {
+export default async function AdminOverview() {
   const admin = await requireAdmin();
   const paused = generationPaused();
-  const customers = db.select().from(schema.customers).orderBy(desc(schema.customers.createdAt)).all();
-  const subs = new Map(db.select().from(schema.subscriptions).all().map((s) => [s.customerId, s]));
-  const plans = new Map(db.select().from(schema.plans).all().map((p) => [p.id, p]));
-  const conns = new Map(db.select().from(schema.metaConnections).all().map((c) => [c.customerId, c]));
-  const stats = new Map(
-    db.select({
-      customerId: schema.contentItems.customerId,
-      total: sql<number>`count(*)`,
-      review: sql<number>`sum(case when ${schema.contentItems.status} = 'awaiting_approval' then 1 else 0 end)`,
-      approved: sql<number>`sum(case when ${schema.contentItems.status} in ('approved','scheduled','published') then 1 else 0 end)`,
-      failed: sql<number>`sum(case when ${schema.contentItems.status} = 'failed' then 1 else 0 end)`,
-      cost: sql<number>`sum(${schema.contentItems.costUsd})`,
-    }).from(schema.contentItems).groupBy(schema.contentItems.customerId).all().map((r) => [r.customerId, r]),
-  );
-  const jobs = db.select().from(schema.jobs).where(sql`${schema.jobs.status} = 'failed'`).orderBy(desc(schema.jobs.finishedAt)).limit(40).all();
-  const running = db.select({ n: sql<number>`count(*)` }).from(schema.jobs).where(sql`${schema.jobs.status} = 'running' or (${schema.jobs.status} = 'queued' and ${schema.jobs.runAt} <= ${Date.now()})`).get()?.n ?? 0;
-  const names = new Map(customers.map((c) => [c.id, c.businessName]));
-  const owned = new Set(db.select({ c: schema.users.customerId }).from(schema.users).all().map((u) => u.c));
-  const mrr = [...subs.values()].filter((s) => s.status === "active").reduce((a, s) => a + (plans.get(s.planId)?.priceInr ?? 0), 0);
-  const totalCost = [...stats.values()].reduce((a, s) => a + (s.cost || 0), 0);
-  const items = db.select({ n: sql<number>`count(*)` }).from(schema.contentItems).where(sql`${schema.contentItems.thumbPath} is not null`).get()?.n ?? 0;
+  const rows = clientRows();
+  const now = Date.now();
+  const worker = getActivity().worker;
+
+  const active = rows.filter((r) => r.status === "active").length;
+  const onboarding = rows.filter((r) => r.status === "onboarding").length;
+  const pausedClients = rows.filter((r) => r.status === "paused").length;
+  const mrr = rows.filter((r) => r.sub?.status === "active" && r.sub.daysLeft > 0).reduce((a, r) => a + (r.plan?.price ?? 0), 0);
+  const renewals = rows.filter((r) => r.sub && r.sub.daysLeft > 0 && r.sub.daysLeft <= 7).length;
+  const posted = rows.reduce((a, r) => a + r.postedThisMonth, 0);
+  const ahead = rows.reduce((a, r) => a + r.upcoming, 0);
+  const waitingOk = rows.reduce((a, r) => a + r.reviewAll, 0);
+  const spend = rows.reduce((a, r) => a + r.spendMonth, 0);
+  const attention = rows.filter((r) => r.issues.length).sort((a, b) => score(b) - score(a));
+  const failedJobs = db.select({ n: sql<number>`count(*)` }).from(schema.jobs).where(eq(schema.jobs.status, "failed")).get()?.n ?? 0;
+
+  const names = new Map(rows.map((r) => [r.id, r.name]));
+  const soon = db.select().from(schema.contentItems)
+    .where(and(inArray(schema.contentItems.status, ["approved", "scheduled"]), gte(schema.contentItems.slotAt, new Date(now)), lt(schema.contentItems.slotAt, new Date(now + 48 * 3600e3))))
+    .orderBy(asc(schema.contentItems.slotAt)).limit(12).all();
 
   return (
-    <div className="min-h-dvh">
-      <header className="flex items-center justify-between bg-rail px-10 py-4 text-rail-text">
-        <div className="flex items-center gap-4"><Wordmark dark href="/admin" /><span className="text-sm">Operations</span></div>
-        <form action={signOut} className="text-sm">{admin.email} · <button className="underline hover:text-white">Sign out</button></form>
-      </header>
-      <main className="px-10 pb-20 pt-8">
-        <p className="tnum flex gap-10 border-b border-line pb-6 text-[0.95rem] text-ink-2">
-          <span><span className="font-display text-2xl text-ink" style={{ fontWeight: 800 }}>{customers.length}</span> customers</span>
-          <span><span className="font-display text-2xl text-ink" style={{ fontWeight: 800 }}>{inr(mrr)}</span> monthly revenue</span>
-          <span><span className="font-display text-2xl text-ink" style={{ fontWeight: 800 }}>{items}</span> items made</span>
-          <span><span className="font-display text-2xl text-ink" style={{ fontWeight: 800 }}>{usd(totalCost)}</span> AI spend</span>
-          <span><span className="font-display text-2xl text-ink" style={{ fontWeight: 800 }}>{running}</span> jobs in flight</span>
+    <AdminShell active="overview" email={admin.email} badges={{ clients: attention.filter((r) => r.issues.some((i) => i.level === "red")).length, jobs: failedJobs }}>
+      <div className="grid grid-cols-4 gap-3 xl:grid-cols-7">
+        <Kpi label="Active clients" value={active} sub={`${onboarding} in setup · ${pausedClients} paused`} href="/admin/customers?show=active" />
+        <Kpi label="Monthly revenue" value={inr(mrr)} sub="active plans, incl. GST" />
+        <Kpi label="Renewals in 7 days" value={renewals} href="/admin/customers?sort=renewal" />
+        <Kpi label="Posted this month" value={posted} sub={`${ahead} scheduled ahead`} />
+        <Kpi label="Waiting for client OK" value={waitingOk} sub="all clients" />
+        <Kpi label="Need attention" value={attention.length} tone={attention.length ? "red" : undefined} href="/admin/customers?show=attention" />
+        <Kpi label="AI spend" value={usd(spend)} sub="latest month of each client" />
+      </div>
+
+      <form action={toggleGeneration} className={`mt-6 flex items-center justify-between gap-6 rounded-[14px] px-5 py-4 ${paused ? "bg-amber-wash" : "bg-sheet ring-1 ring-line"}`}>
+        <input type="hidden" name="pause" value={paused ? "0" : "1"} />
+        <p className={paused ? "text-amber-deep" : "text-ink-2"}>
+          {paused ? <><span className="font-semibold">AI generation is paused.</span> Nothing new is written or designed, so no AI credit is spent. Publishing approved posts and emails continue.</> : <>AI generation is running for all active clients. Pausing holds every queued item until you resume.</>}
         </p>
-
-        <form action={toggleGeneration} className={`mt-8 flex items-center justify-between gap-6 rounded-[14px] px-5 py-4 ${paused ? "bg-amber-wash" : "bg-sheet ring-1 ring-line"}`}>
-          <input type="hidden" name="pause" value={paused ? "0" : "1"} />
-          <p className={paused ? "text-amber-deep" : "text-ink-2"}>
-            {paused ? <><span className="font-semibold">AI generation is paused.</span> Nothing new is written or designed, so no AI credit is spent. Publishing approved posts and emails continue.</> : <>AI generation is running for all active customers. Pausing holds every queued item until you resume.</>}
-          </p>
+        <div className="flex shrink-0 items-center gap-4">
+          <Link href="/admin/activity" className="flex items-center gap-2 text-sm text-ink-2 hover:text-ink">
+            <span className={`size-2 rounded-full ${worker.online ? "bg-mint" : "bg-red"}`} aria-hidden />Worker {worker.online ? `running · ${worker.active}/${worker.concurrency} busy` : "not running"}
+          </Link>
           <button className={`btn ${paused ? "btn-mint" : "btn-ghost"}`}>{paused ? "Resume generation" : "Pause all generation"}</button>
-        </form>
-
-        <h2 className="mt-10 text-lg font-bold">Live activity</h2>
-        <div className="mt-3"><ActivityPanel initial={getActivity()} admin /></div>
-
-        <h2 className="mt-12 text-lg font-bold">Customers</h2>
-        <div className="mt-3 overflow-hidden rounded-[12px] bg-sheet ring-1 ring-line">
-          <table className="tnum w-full text-left text-[0.88rem]">
-            <thead className="border-b border-line text-ink-2"><tr>{["Business", "Plan", "Status", "Instagram", "Items", "To review", "Approved", "Failed", "AI cost", ""].map((h) => <th key={h} className="px-4 py-2.5 font-semibold">{h}</th>)}</tr></thead>
-            <tbody className="divide-y divide-line">
-              {customers.map((c) => {
-                const s = stats.get(c.id); const sub = subs.get(c.id); const conn = conns.get(c.id);
-                return (
-                  <tr key={c.id} className="hover:bg-white">
-                    <td className="px-4 py-3 font-semibold"><Link href={`/admin/customers/${c.id}`} className="hover:text-mint-deep hover:underline">{c.businessName}</Link>{!owned.has(c.id) && <span className="chip ml-2 bg-amber-wash text-amber-deep">No login</span>}<span className="block text-xs font-normal text-ink-3">{fmtDateTime(c.createdAt)}</span></td>
-                    <td className="px-4 py-3">{sub ? `${plans.get(sub.planId)?.name} (${sub.provider})` : "—"}</td>
-                    <td className="px-4 py-3 capitalize">{c.status}{c.status === "onboarding" ? ` · step ${c.onboardStep}` : ""}</td>
-                    <td className="px-4 py-3">{conn ? `@${conn.igUsername}${conn.mode === "demo" ? " (demo)" : ""}` : "—"}</td>
-                    <td className="px-4 py-3">{s?.total ?? 0}</td>
-                    <td className="px-4 py-3">{s?.review ?? 0}</td>
-                    <td className="px-4 py-3">{s?.approved ?? 0}</td>
-                    <td className={`px-4 py-3 ${s?.failed ? "font-semibold text-red" : ""}`}>{s?.failed ?? 0}</td>
-                    <td className="px-4 py-3">{usd(s?.cost ?? 0)}</td>
-                    <td className="px-4 py-3 text-right">
-                      {c.status !== "onboarding" && (
-                        <form action={setCustomerStatus}>
-                          <input type="hidden" name="customerId" value={c.id} />
-                          <input type="hidden" name="status" value={c.status === "paused" ? "active" : "paused"} />
-                          <button className="text-sm font-medium text-ink-2 underline hover:text-ink">{c.status === "paused" ? "Resume" : "Pause"}</button>
-                        </form>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-              {!customers.length && <tr><td colSpan={10} className="px-4 py-8 text-center text-ink-2">No customers yet.</td></tr>}
-            </tbody>
-          </table>
         </div>
+      </form>
 
-        <h2 className="mt-12 text-lg font-bold">Failed jobs</h2>
-        <div className="mt-3 overflow-hidden rounded-[12px] bg-sheet ring-1 ring-line">
-          <table className="tnum w-full text-left text-[0.88rem]">
-            <thead className="border-b border-line text-ink-2"><tr>{["Job", "Customer", "Status", "Tries", "Created", "Error", ""].map((h) => <th key={h} className="px-4 py-2.5 font-semibold">{h}</th>)}</tr></thead>
-            <tbody className="divide-y divide-line">
-              {!jobs.length && <tr><td colSpan={7} className="px-4 py-8 text-center text-ink-2">No failed jobs.</td></tr>}
-              {jobs.map((j) => (
-                <tr key={j.id}>
-                  <td className="px-4 py-2.5 font-mono text-xs">{j.type}</td>
-                  <td className="px-4 py-2.5">{j.customerId ? names.get(j.customerId) : "—"}</td>
-                  <td className="px-4 py-2.5"><span className={`chip ${j.status === "done" ? "bg-mint-wash text-mint-deep" : j.status === "failed" ? "bg-red-wash text-red" : "bg-[#eef1ef] text-ink-2"}`}>{j.status}</span></td>
-                  <td className="px-4 py-2.5">{j.attempts}</td>
-                  <td className="px-4 py-2.5 text-ink-2">{fmtDateTime(j.createdAt)}</td>
-                  <td className="max-w-[360px] truncate px-4 py-2.5 text-ink-2" title={j.error ?? ""}>{j.error}</td>
-                  <td className="px-4 py-2.5 text-right">
-                    {j.status === "failed" && (
-                      <form action={retryJob}><input type="hidden" name="jobId" value={j.id} /><button className="inline-flex items-center gap-1 text-sm font-medium text-mint-deep hover:underline"><RotateCcw className="size-3.5" aria-hidden />Retry</button></form>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </main>
-    </div>
+      <div className="mt-8 grid grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-8">
+        <section>
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-lg font-bold">Needs attention <span className="tnum font-normal text-ink-3">· {attention.length}</span></h2>
+            <Link href="/admin/customers?show=attention" className="text-sm font-medium text-ink-2 underline hover:text-ink">See all clients</Link>
+          </div>
+          <ul className="mt-3 divide-y divide-line overflow-hidden rounded-[12px] bg-sheet ring-1 ring-line">
+            {!attention.length && <li className="px-4 py-8 text-center text-ink-2">All clients are on track.</li>}
+            {attention.slice(0, 10).map((r) => (
+              <li key={r.id} className="flex items-center gap-4 px-4 py-3 hover:bg-white">
+                <Link href={`/admin/customers/${r.id}`} className="min-w-0 flex-1">
+                  <span className="block truncate font-semibold hover:underline">{r.name}</span>
+                  <span className="block truncate text-xs text-ink-3">{r.plan?.name ?? "No plan"} · {r.conn.ig ? `@${r.conn.ig}` : "not connected"}</span>
+                </Link>
+                <IssueChips issues={r.issues} />
+              </li>
+            ))}
+          </ul>
+          {attention.length > 10 && <p className="mt-2 text-sm text-ink-3">+{attention.length - 10} more on the Clients tab.</p>}
+        </section>
+
+        <section>
+          <h2 className="text-lg font-bold">Going out in the next 48 hours <span className="tnum font-normal text-ink-3">· {soon.length}{soon.length === 12 ? "+" : ""}</span></h2>
+          <ul className="mt-3 divide-y divide-line overflow-hidden rounded-[12px] bg-sheet ring-1 ring-line">
+            {!soon.length && <li className="px-4 py-8 text-center text-ink-2">Nothing approved for the next 48 hours.</li>}
+            {soon.map((it) => {
+              const copy = it.copy ? JSON.parse(it.copy) : {};
+              return (
+                <li key={it.id} className="flex items-center gap-3 px-4 py-2.5 text-[0.9rem]">
+                  <span className="tnum w-28 shrink-0 font-semibold">{fmtDateTime(it.slotAt).replace(/,.*/, "")} {fmtTime(it.slotAt)}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate">{copy.on_image_text || copy.cover_text || JSON.parse(it.brief).topic}</span>
+                    <Link href={`/admin/customers/${it.customerId}`} className="block truncate text-xs text-ink-3 hover:underline">{names.get(it.customerId)} · {it.type}</Link>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      </div>
+    </AdminShell>
   );
+}
+
+function score(r: { issues: { level: string }[] }) {
+  return r.issues.reduce((a, i) => a + (i.level === "red" ? 10 : 1), 0);
+}
+
+function Kpi({ label, value, sub, href, tone }: { label: string; value: string | number; sub?: string; href?: string; tone?: "red" }) {
+  const inner = (
+    <>
+      <p className="text-xs font-semibold uppercase tracking-wide text-ink-3">{label}</p>
+      <p className={`tnum mt-1.5 font-display text-[1.7rem] leading-none tracking-[-0.02em] ${tone === "red" ? "text-red" : "text-ink"}`} style={{ fontWeight: 800 }}>{value}</p>
+      {sub && <p className="mt-1.5 truncate text-xs text-ink-3">{sub}</p>}
+    </>
+  );
+  const cls = "block rounded-[12px] bg-sheet px-4 py-3.5 ring-1 ring-line";
+  return href ? <Link href={href} className={`${cls} transition-colors hover:bg-white`}>{inner}</Link> : <div className={cls}>{inner}</div>;
 }
