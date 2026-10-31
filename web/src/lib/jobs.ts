@@ -11,15 +11,29 @@ export function enqueue(type: JobType, payload: Record<string, unknown>, opts: {
     .get();
 }
 
-/** Atomically claim the next due job (SQLite: single-writer, so select + conditional update is safe). */
+/** Jobs that spend AI credit. They wait while generation is paused (globally or for that customer). */
+const SPENDING = ["brand_profile", "plan_month", "generate_item"];
+
+export function generationPaused() {
+  return db.select().from(schema.kv).where(eq(schema.kv.key, "generation_paused")).get()?.value === "1";
+}
+export function setGenerationPaused(on: boolean) {
+  db.insert(schema.kv).values({ key: "generation_paused", value: on ? "1" : "0" })
+    .onConflictDoUpdate({ target: schema.kv.key, set: { value: on ? "1" : "0" } }).run();
+}
+
+/** Claim the next due job (SQLite: single writer, so select + conditional update is safe). */
 export function claimNext() {
-  const next = db
+  const globalPause = generationPaused();
+  const paused = new Set(db.select({ id: schema.customers.id }).from(schema.customers).where(eq(schema.customers.status, "paused")).all().map((c) => c.id));
+  const candidates = db
     .select()
     .from(schema.jobs)
     .where(and(eq(schema.jobs.status, "queued"), lte(schema.jobs.runAt, new Date())))
     .orderBy(asc(schema.jobs.runAt))
-    .limit(1)
-    .get();
+    .limit(50)
+    .all();
+  const next = candidates.find((j) => !SPENDING.includes(j.type) || (!globalPause && !(j.customerId && paused.has(j.customerId))));
   if (!next) return null;
   const res = db
     .update(schema.jobs)

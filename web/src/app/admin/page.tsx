@@ -8,7 +8,8 @@ import { ActivityPanel } from "@/components/ActivityPanel";
 import { getActivity } from "@/lib/activity";
 import { fmtDateTime, inr } from "@/lib/format";
 import { signOut } from "../(auth)/actions";
-import { retryJob, setCustomerStatus } from "./actions";
+import { retryJob, setCustomerStatus, toggleGeneration } from "./actions";
+import { generationPaused } from "@/lib/jobs";
 
 export const metadata = { title: "Admin" };
 export const dynamic = "force-dynamic";
@@ -17,6 +18,7 @@ const usd = (n: number) => `$${n.toFixed(2)}`;
 
 export default async function Admin() {
   const admin = await requireAdmin();
+  const paused = generationPaused();
   const customers = db.select().from(schema.customers).orderBy(desc(schema.customers.createdAt)).all();
   const subs = new Map(db.select().from(schema.subscriptions).all().map((s) => [s.customerId, s]));
   const plans = new Map(db.select().from(schema.plans).all().map((p) => [p.id, p]));
@@ -53,6 +55,14 @@ export default async function Admin() {
           <span><span className="font-display text-2xl text-ink" style={{ fontWeight: 800 }}>{usd(totalCost)}</span> AI spend</span>
           <span><span className="font-display text-2xl text-ink" style={{ fontWeight: 800 }}>{running}</span> jobs in flight</span>
         </p>
+
+        <form action={toggleGeneration} className={`mt-8 flex items-center justify-between gap-6 rounded-[14px] px-5 py-4 ${paused ? "bg-amber-wash" : "bg-sheet ring-1 ring-line"}`}>
+          <input type="hidden" name="pause" value={paused ? "0" : "1"} />
+          <p className={paused ? "text-amber-deep" : "text-ink-2"}>
+            {paused ? <><span className="font-semibold">AI generation is paused.</span> Nothing new is written or designed, so no AI credit is spent. Publishing approved posts and emails continue.</> : <>AI generation is running for all active customers. Pausing holds every queued item until you resume.</>}
+          </p>
+          <button className={`btn ${paused ? "btn-mint" : "btn-ghost"}`}>{paused ? "Resume generation" : "Pause all generation"}</button>
+        </form>
 
         <h2 className="mt-10 text-lg font-bold">Live activity</h2>
         <div className="mt-3"><ActivityPanel initial={getActivity()} admin /></div>

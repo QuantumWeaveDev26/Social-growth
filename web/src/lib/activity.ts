@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, gt, inArray, lte, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { monthLabel } from "./format";
+import { generationPaused } from "./jobs";
 
 export type ActivityJob = {
   id: string;
@@ -28,6 +29,7 @@ export type Activity = {
   recent: ActivityJob[];
   upcoming: { itemId: string; title: string; type: string; at: number; customer: string | null }[];
   today: { done: number; failed: number; published: number };
+  paused: boolean;
 };
 
 const HELD_AFTER = 60 * 60 * 1000;
@@ -123,6 +125,7 @@ export function getActivity(customerId?: string): Activity {
       host: workers[0]?.host ?? last?.host ?? null,
     },
     running, queued, queuedTotal, held, recent, upcoming,
+    paused: generationPaused() || (!!customerId && db.select({ s: schema.customers.status }).from(schema.customers).where(eq(schema.customers.id, customerId)).get()?.s === "paused"),
     today: {
       done: todayRows.find((r) => r.s === "done")?.n ?? 0,
       failed: todayRows.find((r) => r.s === "failed")?.n ?? 0,

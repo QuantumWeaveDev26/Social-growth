@@ -48,7 +48,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
             <p className="tnum mt-2 text-ink-2">{owner?.name} · {owner?.email} · joined {fmtDateTime(c.createdAt)} · <span className="capitalize">{c.status}</span> · AI spend {usd(totalCost)}</p>
           </div>
           <form action={adminSetStatus}><Hidden /><input type="hidden" name="status" value={c.status === "paused" ? "active" : "paused"} />
-            <SubmitButton className="btn btn-ghost" pending="Saving">{c.status === "paused" ? "Resume customer" : "Pause customer"}</SubmitButton>
+            <SubmitButton className="btn btn-ghost" pending="Saving">{c.status === "paused" ? "Resume customer (generation runs again)" : "Pause customer (holds AI generation)"}</SubmitButton>
           </form>
         </div>
 

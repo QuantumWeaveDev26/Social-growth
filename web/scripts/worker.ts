@@ -4,7 +4,7 @@
  */
 import os from "node:os";
 import crypto from "node:crypto";
-import { claimNext, finishJob, stepper } from "../src/lib/jobs";
+import { claimNext, finishJob, stepper, generationPaused, setGenerationPaused } from "../src/lib/jobs";
 import { buildBrandProfile, planMonth, generateItem, publishDue, syncConnections } from "../src/lib/engine";
 import { db, schema } from "../src/db";
 import { deliverNotification } from "../src/lib/notify";
@@ -43,6 +43,10 @@ async function tick() {
     handle(job).finally(() => active--);
   }
 }
+
+// GENERATION_PAUSED=1 starts the server with AI generation held (admin can resume it)
+if (process.env.GENERATION_PAUSED === "1" && !db.select().from(schema.kv).where(eq(schema.kv.key, "generation_paused")).get()) setGenerationPaused(true);
+if (generationPaused()) console.log("AI generation is paused (resume it from the admin page)");
 
 // jobs left "running" by a previous worker process go back in the queue
 const stale = db.update(schema.jobs).set({ status: "queued" }).where(eq(schema.jobs.status, "running")).run();

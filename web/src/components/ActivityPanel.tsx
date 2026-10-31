@@ -94,6 +94,11 @@ export function ActivityPanel({ initial, admin = false, itemHref = (id: string) 
         </p>
       </div>
 
+      {a.paused && (
+        <p className="mt-4 rounded-[12px] bg-amber-wash px-5 py-3 text-sm text-amber-deep">
+          <span className="font-semibold">New content is on hold.</span> Items waiting in line will be made when generation resumes. Approved posts still go out on schedule.
+        </p>
+      )}
       <div className="mt-8 grid grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] gap-10">
         <div className="min-w-0 space-y-9">
           <section aria-labelledby="now-h">

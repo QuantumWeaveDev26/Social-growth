@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireAdmin } from "@/lib/auth";
+import { setGenerationPaused } from "@/lib/jobs";
 
 export async function retryJob(fd: FormData) {
   await requireAdmin();
@@ -19,5 +20,11 @@ export async function retryJob(fd: FormData) {
 export async function setCustomerStatus(fd: FormData) {
   await requireAdmin();
   db.update(schema.customers).set({ status: String(fd.get("status")) }).where(eq(schema.customers.id, String(fd.get("customerId")))).run();
+  revalidatePath("/admin");
+}
+
+export async function toggleGeneration(fd: FormData) {
+  await requireAdmin();
+  setGenerationPaused(String(fd.get("pause")) === "1");
   revalidatePath("/admin");
 }
