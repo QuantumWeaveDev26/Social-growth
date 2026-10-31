@@ -119,7 +119,7 @@ export default async function Landing() {
           </h2>
           <p className="max-w-[26rem] text-ink-2">Every plan includes strategy, design, captions, hashtags, scheduling and your approval step. Prices are per month, including GST.</p>
         </div>
-        <div className="mt-12 grid grid-cols-3 overflow-hidden rounded-[16px] bg-sheet ring-1 ring-line">
+        <div className="mt-12 grid overflow-hidden rounded-[16px] bg-sheet ring-1 ring-line" style={{ gridTemplateColumns: `repeat(${Math.max(plans.length, 1)}, minmax(0, 1fr))` }}>
           {plans.map((p, i) => {
             const featured = p.id === "growth";
             const features = JSON.parse(p.features) as string[];
@@ -127,7 +127,7 @@ export default async function Landing() {
               <div key={p.id} className={`flex flex-col p-8 ${i ? "border-l border-line" : ""} ${featured ? "bg-ink text-white" : ""}`}>
                 <div className="flex items-center justify-between">
                   <h3 className="font-display text-xl" style={{ fontWeight: 700 }}>{p.name}</h3>
-                  {featured && <span className="chip bg-mint text-white">Most chosen</span>}
+                  {featured && <span className="chip bg-mint text-white">Best for Growth</span>}
                 </div>
                 <p className="mt-5 flex items-baseline gap-1.5">
                   <span className="tnum font-display text-[2.8rem] leading-none tracking-[-0.03em]" style={{ fontWeight: 800 }}>{inr(p.priceInr)}</span>
