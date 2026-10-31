@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { and, asc, desc, eq, gt, inArray } from "drizzle-orm";
-import { CalendarClock, Check, ExternalLink, Film } from "lucide-react";
+import { and, asc, desc, eq, gt, gte, inArray, lt } from "drizzle-orm";
+import { CalendarClock, CalendarDays, Check, ExternalLink, Film, List } from "lucide-react";
+import { Calendar, type CalEntry } from "./Calendar";
 import { db, schema } from "@/db";
 import { requireCustomer } from "@/lib/auth";
 import { mediaUrl } from "@/lib/storage";
@@ -19,8 +20,10 @@ const titleOf = (it: Item) => {
   return copy.on_image_text || copy.cover_text || JSON.parse(it.brief).topic || "Untitled";
 };
 
-export default async function SchedulePage() {
+export default async function SchedulePage({ searchParams }: { searchParams: Promise<{ view?: string; month?: string }> }) {
   const { customer } = await requireCustomer();
+  const sp = await searchParams;
+  const view = sp.view === "list" ? "list" : "calendar";
   const conn = db.select().from(schema.metaConnections).where(eq(schema.metaConnections.customerId, customer.id)).get();
   const platforms = conn ? platformsFor(conn) : (["facebook", "instagram"] as const);
   const now = Date.now();
@@ -52,6 +55,33 @@ export default async function SchedulePage() {
     return { label: `BrandMint posts at ${fmtTime(it.slotAt)}`, tone: "plain" };
   };
 
+  // calendar month (IST)
+  const today = istDayKey(new Date());
+  const month = /^\d{4}-\d{2}$/.test(sp.month || "") ? sp.month! : today.slice(0, 7);
+  const [cy, cm] = month.split("-").map(Number);
+  const monthStart = new Date(Date.UTC(cy, cm - 1, 1) - 5.5 * 3600e3);
+  const monthEnd = new Date(Date.UTC(cy, cm, 1) - 5.5 * 3600e3);
+  const monthItems = view === "calendar"
+    ? db.select().from(schema.contentItems)
+      .where(and(eq(schema.contentItems.customerId, customer.id), gte(schema.contentItems.slotAt, monthStart), lt(schema.contentItems.slotAt, monthEnd),
+        inArray(schema.contentItems.status, ["awaiting_approval", "approved", "scheduled", "published", "failed"])))
+      .orderBy(asc(schema.contentItems.slotAt)).all()
+    : [];
+  const monthJobs = monthItems.length ? db.select().from(schema.publishJobs).where(inArray(schema.publishJobs.itemId, monthItems.map((i) => i.id))).all() : [];
+  const entries: CalEntry[] = monthItems.map((it) => {
+    const its = monthJobs.filter((j) => j.itemId === it.id);
+    const state: CalEntry["state"] = it.status === "published" ? "posted" : it.status === "failed" ? "failed" : it.status === "awaiting_approval" ? "review" : "scheduled";
+    const posted = (p: string) => its.some((j) => j.platform === p && j.status === "published");
+    const onMeta = its.some((j) => j.platform === "facebook" && j.status === "meta_scheduled" && j.scheduledAt.getTime() === it.slotAt.getTime());
+    const live = state === "scheduled" || state === "posted";
+    return {
+      id: it.id, day: istDayKey(it.slotAt), time: fmtTime(it.slotAt), title: titleOf(it),
+      thumb: mediaUrl(it.thumbPath || (it.mediaPath?.endsWith(".mp4") ? null : it.mediaPath)), reel: it.type === "reel", state,
+      fb: !live || !(platforms as readonly string[]).includes("facebook") ? null : posted("facebook") ? "posted" : onMeta ? "meta" : "brandmint",
+      ig: !live || !(platforms as readonly string[]).includes("instagram") ? null : posted("instagram") ? "posted" : "brandmint",
+    };
+  });
+
   // group upcoming by IST day
   const days = new Map<string, Item[]>();
   for (const it of upcoming) days.set(istDayKey(it.slotAt), [...(days.get(istDayKey(it.slotAt)) || []), it]);
@@ -62,12 +92,18 @@ export default async function SchedulePage() {
         <div>
           <h1 className="font-display text-[2.3rem] leading-none tracking-[-0.03em]" style={{ fontWeight: 800 }}>Schedule</h1>
           <p className="mt-3 max-w-[70ch] text-ink-2">
-            Everything you’ve approved, in the order it goes out. Facebook image posts also appear in your Meta Business Suite under <span className="font-semibold text-ink">Scheduled</span>. Instagram doesn’t let outside apps add to its schedule, so BrandMint posts those at the time shown.
+            Everything you’ve approved, by day. Facebook image posts also appear in your Meta Business Suite under <span className="font-semibold text-ink">Scheduled</span>. Instagram doesn’t let outside apps add to its schedule, so BrandMint posts those at the time shown.
           </p>
         </div>
+        <div className="flex shrink-0 items-center gap-2">
+        <nav className="flex rounded-[10px] bg-sheet p-1 ring-1 ring-line" aria-label="View">
+          <Link href={`/app/schedule${sp.month ? `?month=${sp.month}` : ""}`} aria-current={view === "calendar" ? "page" : undefined} className={`flex items-center gap-1.5 rounded-[8px] px-3 py-1.5 text-sm font-medium ${view === "calendar" ? "bg-ink text-white" : "text-ink-2 hover:text-ink"}`}><CalendarDays className="size-4" aria-hidden />Calendar</Link>
+          <Link href="/app/schedule?view=list" aria-current={view === "list" ? "page" : undefined} className={`flex items-center gap-1.5 rounded-[8px] px-3 py-1.5 text-sm font-medium ${view === "list" ? "bg-ink text-white" : "text-ink-2 hover:text-ink"}`}><List className="size-4" aria-hidden />List</Link>
+        </nav>
         {conn?.pageId && conn.kind !== "instagram" && (
           <a href={metaScheduledUrl(conn.pageId)} target="_blank" rel="noopener noreferrer" className="btn btn-ghost shrink-0">Open Meta Business Suite<ExternalLink className="size-4" aria-hidden /></a>
         )}
+        </div>
       </header>
 
       {!conn && (
@@ -81,6 +117,7 @@ export default async function SchedulePage() {
         </p>
       )}
 
+      {view === "calendar" ? <Calendar month={month} today={today} entries={entries} /> : (<>
       <section className="mt-8">
         <h2 className="text-[1.05rem] font-bold">Coming up <span className="tnum font-normal text-ink-3">· {upcoming.length}</span></h2>
         {upcoming.length === 0 ? (
@@ -107,6 +144,7 @@ export default async function SchedulePage() {
           </ul>
         </section>
       )}
+      </>)}
     </main>
   );
 }
