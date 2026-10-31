@@ -12,7 +12,7 @@ import { db, schema } from "@/db";
 import { chatJson, generateImage, textToSpeech, type Alignment } from "./ai";
 import { saveFile, absPath, STORAGE_ROOT } from "./storage";
 import { enqueue, type StepFn } from "./jobs";
-import { publishToMeta, platformsFor, MetaError, checkConnection, refreshInstagramToken } from "./meta";
+import { publishToMeta, platformsFor, MetaError, checkConnection, refreshInstagramToken, canScheduleOnFacebook, scheduleFacebookPost, facebookPostIsPublished, deleteFacebookPost, FB_SCHEDULE_MIN_MS, FB_SCHEDULE_MAX_MS } from "./meta";
 import { seal, open as openSecret } from "./crypto";
 import { notify } from "./notify";
 import { monthLabel } from "./format";
@@ -359,9 +359,42 @@ export async function publishDue() {
     }
     const copy = JSON.parse(item.copy || "{}");
     const platforms = platformsFor(conn);
+    let waiting = false;
     for (const platform of platforms) {
       const prior = db.select().from(schema.publishJobs).where(and(eq(schema.publishJobs.itemId, item.id), eq(schema.publishJobs.platform, platform), eq(schema.publishJobs.status, "published"))).get();
       if (prior) continue;
+      // Facebook post already handed to Meta's scheduler: confirm Meta published it instead of posting twice
+      const onMeta = platform === "facebook"
+        ? db.select().from(schema.publishJobs).where(and(eq(schema.publishJobs.itemId, item.id), eq(schema.publishJobs.platform, "facebook"), eq(schema.publishJobs.status, "meta_scheduled"))).get()
+        : undefined;
+      if (onMeta?.remoteId) {
+        try {
+          if (onMeta.scheduledAt.getTime() === item.slotAt.getTime()) {
+            const live = await facebookPostIsPublished(conn, onMeta.remoteId).catch((e) => { console.error(`checking ${onMeta.remoteId}:`, e instanceof Error ? e.message : e); return null; });
+            if (live) {
+              db.update(schema.publishJobs).set({ status: "fired" }).where(eq(schema.publishJobs.id, onMeta.id)).run();
+              db.insert(schema.publishJobs).values({ itemId: item.id, platform, scheduledAt: item.slotAt, status: "published", remoteId: onMeta.remoteId }).run();
+              continue;
+            }
+            // Meta publishes on its own clock; give it a few minutes before taking over
+            if (Date.now() - item.slotAt.getTime() < 10 * 60_000) { waiting = true; continue; }
+            if (live === null) {
+              // can't tell whether Meta posted it: never delete or post again (that risks a double post)
+              db.update(schema.publishJobs).set({ status: "fired" }).where(eq(schema.publishJobs.id, onMeta.id)).run();
+              db.insert(schema.publishJobs).values({ itemId: item.id, platform, scheduledAt: item.slotAt, status: "published", remoteId: onMeta.remoteId, error: "Scheduled on Meta; couldn’t confirm it went out" }).run();
+              continue;
+            }
+          }
+          // time changed (Post now) or Meta didn't publish: take it off Meta's schedule and post directly
+          await deleteFacebookPost(conn, onMeta.remoteId);
+          db.update(schema.publishJobs).set({ status: "cancelled" }).where(eq(schema.publishJobs.id, onMeta.id)).run();
+        } catch (e) {
+          const err = e instanceof MetaError ? e : new MetaError(String(e));
+          console.error(`facebook scheduled post ${onMeta.remoteId}:`, err.message);
+          db.insert(schema.publishJobs).values({ itemId: item.id, platform, scheduledAt: item.slotAt, status: "failed", error: `Couldn’t check the post scheduled on Facebook: ${err.message}`.slice(0, 500) }).run();
+          continue;
+        }
+      }
       try {
         const remoteId = await publishToMeta(conn, item, copy, platform);
         db.insert(schema.publishJobs).values({ itemId: item.id, platform, scheduledAt: item.slotAt, status: "published", remoteId }).run();
@@ -376,7 +409,7 @@ export async function publishDue() {
         }
       }
     }
-    if (blocked.has(item.customerId)) continue;
+    if (blocked.has(item.customerId) || waiting) continue;
     const results = db.select().from(schema.publishJobs).where(eq(schema.publishJobs.itemId, item.id)).all();
     const ok = platforms.every((p) => results.some((r) => r.platform === p && r.status === "published"));
     const lastErr = results.filter((r) => r.status === "failed").at(-1)?.error;
@@ -388,6 +421,65 @@ export async function publishDue() {
       title: "A scheduled post couldn’t go out",
       body: `Meta rejected one of today’s posts: ${lastErr ?? "unknown error"}.\n\nOpen it to see the details. You can ask us to remake it.`, cta: "See the post",
     });
+  }
+}
+
+/**
+ * Keeps Meta's own scheduler in step with BrandMint: approved image posts within Meta's window are
+ * scheduled on the Facebook Page (visible in Meta Business Suite → Scheduled); posts that were pulled
+ * back, remade or moved are taken off it. Instagram has no scheduling API, so the worker posts those.
+ */
+export async function syncFacebookSchedule() {
+  const now = Date.now();
+  const conns = new Map<string, typeof schema.metaConnections.$inferSelect | undefined>();
+  const connFor = (customerId: string) => {
+    if (!conns.has(customerId)) conns.set(customerId, db.select().from(schema.metaConnections).where(eq(schema.metaConnections.customerId, customerId)).get());
+    return conns.get(customerId);
+  };
+
+  // 1. take stale posts off Meta's schedule
+  const onMeta = db.select({ pj: schema.publishJobs, item: schema.contentItems })
+    .from(schema.publishJobs).innerJoin(schema.contentItems, eq(schema.publishJobs.itemId, schema.contentItems.id))
+    .where(eq(schema.publishJobs.status, "meta_scheduled")).all();
+  for (const { pj, item } of onMeta) {
+    const stillWanted = ["approved", "scheduled"].includes(item.status) && item.slotAt.getTime() === pj.scheduledAt.getTime();
+    if (stillWanted || pj.scheduledAt.getTime() <= now + 60_000 || !pj.remoteId) continue; // due ones are handled by publishDue
+    const conn = connFor(item.customerId);
+    if (!conn || conn.status !== "connected") continue;
+    try {
+      await deleteFacebookPost(conn, pj.remoteId);
+      db.update(schema.publishJobs).set({ status: "cancelled" }).where(eq(schema.publishJobs.id, pj.id)).run();
+      console.log(`removed ${pj.remoteId} from Facebook schedule (item ${item.id})`);
+    } catch (e) {
+      console.error(`couldn't remove ${pj.remoteId} from Facebook schedule:`, e instanceof Error ? e.message : e);
+    }
+  }
+
+  // 2. schedule approved posts that aren't on Meta yet
+  const upcoming = db.select().from(schema.contentItems)
+    .where(and(inArray(schema.contentItems.status, ["approved", "scheduled"]), eq(schema.contentItems.type, "post")))
+    .orderBy(asc(schema.contentItems.slotAt)).all()
+    .filter((it) => it.slotAt.getTime() >= now + FB_SCHEDULE_MIN_MS && it.slotAt.getTime() <= now + FB_SCHEDULE_MAX_MS);
+  let made = 0;
+  for (const item of upcoming) {
+    if (made >= 10) break; // a few per pass keeps us well inside Meta's rate limits
+    const conn = connFor(item.customerId);
+    if (!conn || !canScheduleOnFacebook(conn, item)) continue;
+    const jobs = db.select().from(schema.publishJobs).where(and(eq(schema.publishJobs.itemId, item.id), eq(schema.publishJobs.platform, "facebook"))).all();
+    if (jobs.some((j) => j.status === "meta_scheduled" || j.status === "published")) continue;
+    if (jobs.some((j) => j.status === "schedule_failed" && now - j.createdAt.getTime() < 6 * 3600e3)) continue;
+    try {
+      const remoteId = await scheduleFacebookPost(conn, item, JSON.parse(item.copy || "{}"));
+      db.insert(schema.publishJobs).values({ itemId: item.id, platform: "facebook", scheduledAt: item.slotAt, status: "meta_scheduled", remoteId }).run();
+      console.log(`scheduled item ${item.id} on Facebook for ${item.slotAt.toISOString()} (${remoteId})`);
+    } catch (e) {
+      const err = e instanceof MetaError ? e : new MetaError(String(e));
+      console.error(`couldn't schedule item ${item.id} on Facebook:`, err.message);
+      // the worker still posts it at the slot time; we retry scheduling on Meta in 6 hours
+      db.insert(schema.publishJobs).values({ itemId: item.id, platform: "facebook", scheduledAt: item.slotAt, status: "schedule_failed", error: err.message.slice(0, 500) }).run();
+      if (err.needsReconnect) break;
+    }
+    made++;
   }
 }
 

@@ -38,6 +38,7 @@ export default async function ItemPage({ params, searchParams }: { params: Promi
   const logo = mediaUrl(customer.logoPath);
   const published = db.select().from(schema.publishJobs).where(eq(schema.publishJobs.itemId, id)).all();
   // approved and its time has come: the worker picks it up within ~30 seconds
+  const onMetaSchedule = published.some((p) => p.status === "meta_scheduled" && p.scheduledAt.getTime() === item.slotAt.getTime());
   const posting = (item.status === "scheduled" || item.status === "approved") && item.slotAt.getTime() <= Date.now();
   const postedAt = published.filter((p) => p.status === "published").map((p) => p.createdAt).sort((a, b) => b.getTime() - a.getTime())[0];
 
@@ -145,6 +146,7 @@ export default async function ItemPage({ params, searchParams }: { params: Promi
                 <div>
                   <p className="font-semibold text-mint-deep">Approved. Scheduled for {fmtDateTime(item.slotAt)}.</p>
                   <p className="text-sm text-ink-2">{conn ? `Will post to @${conn.igUsername} and ${conn.pageName}.` : "Connect Instagram and Facebook in Accounts so this can post."}</p>
+                  {onMetaSchedule && <p className="mt-1 text-sm text-ink-2">Facebook: also in your <a href={`https://business.facebook.com/latest/posts/scheduled_posts?asset_id=${conn?.pageId ?? ""}`} target="_blank" rel="noopener noreferrer" className="font-semibold text-ink underline">Meta Business Suite schedule</a>.</p>}
                 </div>
               </div>
               <div className="flex shrink-0 gap-2">

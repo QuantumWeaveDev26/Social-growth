@@ -163,6 +163,49 @@ export async function publishToMeta(conn: Conn | undefined, item: Item, copy: Re
   return pub.id;
 }
 
+// ---------------------------------------------------------------- Facebook native scheduling
+// Approved image posts are also handed to Meta's own scheduler, so customers see them in
+// Meta Business Suite → Content → Scheduled. Instagram has no scheduling API for outside apps,
+// so Instagram (and reels) are always published by our worker at the slot time.
+
+/** Meta accepts scheduled Page posts between 10 minutes and ~30 days ahead; we stay inside that. */
+export const FB_SCHEDULE_MIN_MS = 15 * 60_000;
+export const FB_SCHEDULE_MAX_MS = 28 * 86400e3;
+
+export const canScheduleOnFacebook = (conn: Conn | undefined, item: Item) =>
+  !!conn && conn.mode !== "demo" && conn.kind !== "instagram" && conn.status === "connected" && !!conn.pageId && item.type === "post" && !!item.mediaPath;
+
+/** Creates an unpublished, scheduled photo post on the Page. Returns the Page post id. */
+export async function scheduleFacebookPost(conn: Conn, item: Item, copy: Record<string, unknown>) {
+  const token = open(conn.pageToken)!;
+  const r = await g<{ id: string; post_id?: string }>(`${FB_GRAPH()}/${conn.pageId}/photos`, {
+    method: "POST",
+    body: new URLSearchParams({
+      url: `${appUrl()}/media/${item.mediaPath}`, caption: String(copy.facebook_post || ""),
+      published: "false", scheduled_publish_time: String(Math.floor(item.slotAt.getTime() / 1000)), access_token: token,
+    }),
+  });
+  return r.post_id || r.id;
+}
+
+/** True once Meta has published a scheduled post. */
+export async function facebookPostIsPublished(conn: Conn, postId: string) {
+  const token = open(conn.pageToken)!;
+  const r = await g<{ is_published?: boolean }>(`${FB_GRAPH()}/${postId}?fields=is_published&access_token=${encodeURIComponent(token)}`);
+  return r.is_published === true;
+}
+
+/** Removes a scheduled post from Meta. A post that's already gone counts as removed. */
+export async function deleteFacebookPost(conn: Conn, postId: string) {
+  const token = open(conn.pageToken)!;
+  try {
+    await g(`${FB_GRAPH()}/${postId}?access_token=${encodeURIComponent(token)}`, { method: "DELETE" });
+  } catch (e) {
+    if (e instanceof MetaError && e.code === 100) return; // does not exist any more
+    throw e;
+  }
+}
+
 // ---------------------------------------------------------------- Meta callbacks (deauthorize, data deletion)
 /** Verifies a signed_request from Meta with either app secret. Returns the payload or null. */
 export function parseSignedRequest(signed: string | null): { user_id?: string; algorithm?: string } | null {

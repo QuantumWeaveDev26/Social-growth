@@ -5,7 +5,7 @@
 import os from "node:os";
 import crypto from "node:crypto";
 import { claimNext, finishJob, stepper, generationPaused, setGenerationPaused } from "../src/lib/jobs";
-import { buildBrandProfile, planMonth, generateItem, publishDue, syncConnections } from "../src/lib/engine";
+import { buildBrandProfile, planMonth, generateItem, publishDue, syncConnections, syncFacebookSchedule } from "../src/lib/engine";
 import { db, schema } from "../src/db";
 import { deliverNotification } from "../src/lib/notify";
 import { runDaily } from "../src/lib/cycle";
@@ -57,7 +57,10 @@ let publishing = false;
 setInterval(async () => {
   if (publishing) return;
   publishing = true;
-  try { await publishDue(); } catch (e) { console.error("publish error", e); } finally { publishing = false; }
+  try {
+    await publishDue();
+    await syncFacebookSchedule();
+  } catch (e) { console.error("publish error", e); } finally { publishing = false; }
 }, 30_000);
 setInterval(tick, 1500);
 

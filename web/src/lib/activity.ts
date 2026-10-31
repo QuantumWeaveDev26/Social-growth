@@ -88,13 +88,17 @@ export function getActivity(customerId?: string): Activity {
     .select({ pj: schema.publishJobs, customerId: schema.contentItems.customerId })
     .from(schema.publishJobs)
     .innerJoin(schema.contentItems, eq(schema.publishJobs.itemId, schema.contentItems.id))
-    .where(customerId ? eq(schema.contentItems.customerId, customerId) : undefined)
+    .where(and(inArray(schema.publishJobs.status, ["published", "failed", "meta_scheduled", "schedule_failed"]), customerId ? eq(schema.contentItems.customerId, customerId) : undefined))
     .orderBy(desc(schema.publishJobs.createdAt)).limit(10).all();
   const published: ActivityJob[] = pubRows.map(({ pj, customerId: cid }) => {
     const it = item(pj.itemId);
+    const where = pj.platform === "facebook" ? "Facebook" : "Instagram";
+    const verb = pj.status === "meta_scheduled" ? "Scheduled on Facebook (Meta Business Suite)"
+      : pj.status === "schedule_failed" ? "Couldn’t add to Facebook’s schedule (we’ll still post it on time)"
+      : pj.status === "failed" ? `Couldn’t post to ${where}` : `Posted to ${where}`;
     return {
-      id: pj.id, kind: "publish", title: `Posted to ${pj.platform === "facebook" ? "Facebook" : "Instagram"}: ${it?.title ?? ""}`, detail: pj.remoteId,
-      customer: names.get(cid) ?? null, itemId: pj.itemId, itemType: it?.type ?? null, status: pj.status === "published" ? "done" : "failed",
+      id: pj.id, kind: "publish", title: `${verb}: ${it?.title ?? ""}`, detail: pj.remoteId,
+      customer: names.get(cid) ?? null, itemId: pj.itemId, itemType: it?.type ?? null, status: pj.status === "published" || pj.status === "meta_scheduled" ? "done" : "failed",
       step: null, attempts: 1, at: pj.createdAt.getTime(), durationMs: null, error: pj.error,
     };
   });
