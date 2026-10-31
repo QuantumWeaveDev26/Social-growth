@@ -12,7 +12,7 @@ import { db, schema } from "@/db";
 import { chatJson, generateImage, textToSpeech, type Alignment } from "./ai";
 import { saveFile, absPath, STORAGE_ROOT } from "./storage";
 import { enqueue, type StepFn } from "./jobs";
-import { publishToMeta, platformsFor, MetaError, checkConnection, refreshInstagramToken, canScheduleOnFacebook, scheduleFacebookPost, facebookPostIsPublished, deleteFacebookPost, FB_SCHEDULE_MIN_MS, FB_SCHEDULE_MAX_MS } from "./meta";
+import { publishToMeta, platformsFor, MetaError, checkConnection, refreshInstagramToken, canScheduleOnFacebook, scheduleFacebookPost, facebookPostIsPublished, deleteFacebookPost, isPagePostId, FB_SCHEDULE_MIN_MS, FB_SCHEDULE_MAX_MS } from "./meta";
 import { seal, open as openSecret } from "./crypto";
 import { notify } from "./notify";
 import { monthLabel } from "./format";
@@ -442,7 +442,8 @@ export async function syncFacebookSchedule() {
     .from(schema.publishJobs).innerJoin(schema.contentItems, eq(schema.publishJobs.itemId, schema.contentItems.id))
     .where(eq(schema.publishJobs.status, "meta_scheduled")).all();
   for (const { pj, item } of onMeta) {
-    const stillWanted = ["approved", "scheduled"].includes(item.status) && item.slotAt.getTime() === pj.scheduledAt.getTime();
+    // first-version entries (bare photo ids) are replaced with proper scheduled Page posts
+    const stillWanted = ["approved", "scheduled"].includes(item.status) && item.slotAt.getTime() === pj.scheduledAt.getTime() && isPagePostId(pj.remoteId);
     if (stillWanted || pj.scheduledAt.getTime() <= now + 60_000 || !pj.remoteId) continue; // due ones are handled by publishDue
     const conn = connFor(item.customerId);
     if (!conn || conn.status !== "connected") continue;

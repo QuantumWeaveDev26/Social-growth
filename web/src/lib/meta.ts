@@ -175,18 +175,30 @@ export const FB_SCHEDULE_MAX_MS = 28 * 86400e3;
 export const canScheduleOnFacebook = (conn: Conn | undefined, item: Item) =>
   !!conn && conn.mode !== "demo" && conn.kind !== "instagram" && conn.status === "connected" && !!conn.pageId && item.type === "post" && !!item.mediaPath;
 
-/** Creates an unpublished, scheduled photo post on the Page. Returns the Page post id. */
+/**
+ * Creates a scheduled Page post with the image attached (Meta's documented flow for scheduled photo
+ * posts: upload the photo unpublished, then create the scheduled feed post). Returns the Page post id
+ * ("<pageId>_<postId>"), which shows in Meta Business Suite → Scheduled.
+ */
 export async function scheduleFacebookPost(conn: Conn, item: Item, copy: Record<string, unknown>) {
   const token = open(conn.pageToken)!;
-  const r = await g<{ id: string; post_id?: string }>(`${FB_GRAPH()}/${conn.pageId}/photos`, {
+  const photo = await g<{ id: string }>(`${FB_GRAPH()}/${conn.pageId}/photos`, {
+    method: "POST",
+    body: new URLSearchParams({ url: `${appUrl()}/media/${item.mediaPath}`, published: "false", temporary: "true", access_token: token }),
+  });
+  const post = await g<{ id: string }>(`${FB_GRAPH()}/${conn.pageId}/feed`, {
     method: "POST",
     body: new URLSearchParams({
-      url: `${appUrl()}/media/${item.mediaPath}`, caption: String(copy.facebook_post || ""),
+      message: String(copy.facebook_post || ""),
+      "attached_media[0]": JSON.stringify({ media_fbid: photo.id }),
       published: "false", scheduled_publish_time: String(Math.floor(item.slotAt.getTime() / 1000)), access_token: token,
     }),
   });
-  return r.post_id || r.id;
+  return post.id;
 }
+
+/** Ids from the first version were bare photo ids; Page post ids look like "<pageId>_<postId>". */
+export const isPagePostId = (id: string | null | undefined) => !!id && id.includes("_");
 
 /** True once Meta has published a scheduled post. */
 export async function facebookPostIsPublished(conn: Conn, postId: string) {
