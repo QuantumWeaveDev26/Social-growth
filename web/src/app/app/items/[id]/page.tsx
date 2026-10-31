@@ -9,12 +9,12 @@ import { fmtDateTime } from "@/lib/format";
 import { StatusChip, ApproveMark } from "@/components/ui";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { SubmitButton } from "@/components/SubmitButton";
-import { approveItem, unscheduleItem } from "../../actions";
+import { approveItem, unscheduleItem, postNow } from "../../actions";
 import { ChangesForm, PreviewTabs } from "./Client";
 
 export const metadata = { title: "Review" };
 
-export default async function ItemPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ approved?: string }> }) {
+export default async function ItemPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ approved?: string; posting?: string }> }) {
   const { id } = await params;
   const sp = await searchParams;
   const { customer } = await requireCustomer();
@@ -75,7 +75,7 @@ export default async function ItemPage({ params, searchParams }: { params: Promi
 
   return (
     <main className="px-12 pb-20 pt-8">
-      <AutoRefresh active={making} />
+      <AutoRefresh active={making || (sp.posting === "1" && item.status !== "published" && item.status !== "failed")} />
       <div className="flex items-center justify-between">
         <Link href="/app" className="flex items-center gap-1.5 text-sm font-medium text-ink-2 hover:text-ink"><ArrowLeft className="size-4" aria-hidden />Proof sheet</Link>
         <div className="flex items-center gap-1 text-sm text-ink-2">
@@ -134,7 +134,10 @@ export default async function ItemPage({ params, searchParams }: { params: Promi
                   <p className="text-sm text-ink-2">{conn ? `Will post to @${conn.igUsername} and ${conn.pageName}.` : "Connect Instagram and Facebook in Accounts so this can post."}</p>
                 </div>
               </div>
-              <form action={unscheduleItem}><input type="hidden" name="itemId" value={id} /><SubmitButton className="btn btn-ghost" pending="Pulling back">Pull back for changes</SubmitButton></form>
+              <div className="flex shrink-0 gap-2">
+                <form action={postNow}><input type="hidden" name="itemId" value={id} /><SubmitButton className="btn btn-primary" pending="Posting">Post now</SubmitButton></form>
+                <form action={unscheduleItem}><input type="hidden" name="itemId" value={id} /><SubmitButton className="btn btn-ghost" pending="Pulling back">Pull back for changes</SubmitButton></form>
+              </div>
             </div>
           )}
 

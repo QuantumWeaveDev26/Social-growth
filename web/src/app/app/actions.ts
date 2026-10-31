@@ -74,6 +74,17 @@ export async function unscheduleItem(fd: FormData) {
   redirect(`/app/items/${itemId}`);
 }
 
+/** Publishes an approved post on the worker's next pass (within about 30 seconds). */
+export async function postNow(fd: FormData) {
+  const itemId = String(fd.get("itemId"));
+  const { item } = await ownItem(itemId);
+  if (item.status === "scheduled" || item.status === "approved") {
+    db.update(schema.contentItems).set({ slotAt: new Date(), updatedAt: new Date() }).where(eq(schema.contentItems.id, itemId)).run();
+  }
+  revalidatePath("/app");
+  redirect(`/app/items/${itemId}?posting=1`);
+}
+
 export async function startNextMonth() {
   const { customer } = await requireCustomer();
   const plans = db.select().from(schema.contentPlans).where(eq(schema.contentPlans.customerId, customer.id)).all();
