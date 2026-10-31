@@ -37,6 +37,9 @@ export default async function ItemPage({ params, searchParams }: { params: Promi
   const handle = conn?.igUsername || customer.businessName.toLowerCase().replace(/[^a-z0-9]+/g, "");
   const logo = mediaUrl(customer.logoPath);
   const published = db.select().from(schema.publishJobs).where(eq(schema.publishJobs.itemId, id)).all();
+  // approved and its time has come: the worker picks it up within ~30 seconds
+  const posting = (item.status === "scheduled" || item.status === "approved") && item.slotAt.getTime() <= Date.now();
+  const postedAt = published.filter((p) => p.status === "published").map((p) => p.createdAt).sort((a, b) => b.getTime() - a.getTime())[0];
 
   const media = making || !item.mediaPath ? (
     <div className="developing grid size-full place-items-center">
@@ -75,7 +78,7 @@ export default async function ItemPage({ params, searchParams }: { params: Promi
 
   return (
     <main className="px-12 pb-20 pt-8">
-      <AutoRefresh active={making || (sp.posting === "1" && item.status !== "published" && item.status !== "failed")} />
+      <AutoRefresh active={making || posting} />
       <div className="flex items-center justify-between">
         <Link href="/app" className="flex items-center gap-1.5 text-sm font-medium text-ink-2 hover:text-ink"><ArrowLeft className="size-4" aria-hidden />Proof sheet</Link>
         <div className="flex items-center gap-1 text-sm text-ink-2">
@@ -125,7 +128,17 @@ export default async function ItemPage({ params, searchParams }: { params: Promi
             </div>
           )}
 
-          {(item.status === "scheduled" || item.status === "approved") && (
+          {posting && (
+            <div className="mt-8 flex items-center gap-4 rounded-[14px] bg-mint-wash/70 p-6" role="status" aria-live="polite">
+              <Loader2 className="size-8 shrink-0 animate-spin text-mint-deep" aria-hidden />
+              <div>
+                <p className="font-semibold text-mint-deep">Posting to {conn ? `@${conn.igUsername} and ${conn.pageName}` : "Instagram and Facebook"} now…</p>
+                <p className="text-sm text-ink-2">This takes up to a minute. You don’t need to click again; this page updates by itself.</p>
+              </div>
+            </div>
+          )}
+
+          {(item.status === "scheduled" || item.status === "approved") && !posting && (
             <div className="mt-8 flex items-center justify-between gap-6 rounded-[14px] bg-mint-wash/70 p-6">
               <div className="flex items-center gap-4">
                 <ApproveMark draw={sp.approved === id} className="w-12" />
@@ -143,8 +156,14 @@ export default async function ItemPage({ params, searchParams }: { params: Promi
 
           {item.status === "published" && (
             <div className="mt-8 rounded-[14px] bg-mint-wash/70 p-6">
-              <p className="font-semibold text-mint-deep">Posted</p>
-              <ul className="mt-2 space-y-1 text-sm text-ink-2">{published.filter((p) => p.status === "published").map((p) => <li key={p.id} className="capitalize">{p.platform}: <span className="font-mono text-xs normal-case">{p.remoteId}</span></li>)}</ul>
+              <p className="flex items-center gap-2 font-semibold text-mint-deep"><Check className="size-5" aria-hidden />Posted{postedAt ? ` · ${fmtDateTime(postedAt)}` : ""}</p>
+              <ul className="mt-3 flex flex-wrap gap-2 text-sm">
+                {published.filter((p) => p.status === "published").map((p) => {
+                  const href = p.platform === "facebook" ? `https://www.facebook.com/${p.remoteId}` : conn?.igUsername ? `https://www.instagram.com/${conn.igUsername}/` : null;
+                  const label = p.platform === "facebook" ? "View on Facebook" : "View on Instagram";
+                  return <li key={p.id}>{href ? <a href={href} target="_blank" rel="noopener noreferrer" className="btn btn-ghost">{label}</a> : <span className="capitalize">{p.platform}: posted</span>}</li>;
+                })}
+              </ul>
             </div>
           )}
 
