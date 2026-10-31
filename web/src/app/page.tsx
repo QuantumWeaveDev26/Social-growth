@@ -169,7 +169,9 @@ export default async function Landing() {
       <footer className="bg-rail text-rail-text">
         <div className="mx-auto flex max-w-[1240px] items-center justify-between px-8 py-10 text-sm">
           <Wordmark dark />
-          <span>Social media content for Indian small businesses · A Quantum Weave AI product</span>
+          <span className="text-right">Social media content for Indian small businesses · A Quantum Weave AI product
+            <span className="mt-2 block space-x-3"><a href="/privacy" className="underline hover:text-white">Privacy</a><a href="/terms" className="underline hover:text-white">Terms</a><a href="/refunds" className="underline hover:text-white">Cancellation and refunds</a><a href="/data-deletion" className="underline hover:text-white">Data deletion</a></span>
+          </span>
         </div>
       </footer>
     </div>

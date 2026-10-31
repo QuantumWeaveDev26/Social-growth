@@ -38,6 +38,7 @@ export function SignUpForm({ plan }: { plan?: string }) {
       <div><label className="label" htmlFor="email">Work email</label><input id="email" name="email" type="email" autoComplete="email" required className="field" /></div>
       <div><label className="label" htmlFor="password">Password</label><input id="password" name="password" type="password" autoComplete="new-password" minLength={8} required className="field" /><p className="hint">At least 8 characters.</p></div>
       <SubmitButton className="btn btn-primary w-full py-3" pending="Creating your account">Create account</SubmitButton>
+      <p className="text-xs text-ink-3">By creating an account you agree to our <a href="/terms" target="_blank" className="underline">Terms</a>, <a href="/privacy" target="_blank" className="underline">Privacy policy</a> and <a href="/refunds" target="_blank" className="underline">Cancellation and refund policy</a>.</p>
       <p className="text-sm text-ink-2">Already have an account? <Link href="/login" className="font-semibold text-mint-deep underline">Sign in</Link></p>
     </form>
   );

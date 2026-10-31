@@ -18,6 +18,7 @@ export default function Privacy() {
         <p>Access tokens are encrypted at rest. Data is kept while your account is active and deleted on request.</p>
         <H>Your choices</H>
         <p>Disconnect Meta at any time from Connections, or remove the app in your Facebook or Instagram settings. See <a className="font-semibold text-mint-deep underline" href="/data-deletion">data deletion</a>. Questions: support@brandmintai.io.</p>
+        <p className="mt-8 text-sm"><a className="underline" href="/terms">Terms of service</a> · <a className="underline" href="/refunds">Cancellation and refunds</a></p>
       </main>
     </div>
   );

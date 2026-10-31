@@ -105,7 +105,7 @@ export function ActivityPanel({ initial, admin = false, itemHref = (id: string) 
             <h2 id="now-h" className="flex items-baseline gap-2 text-[1.05rem] font-bold">Working on now <span className="tnum text-sm font-medium text-ink-3">{a.running.length}</span></h2>
             {a.running.length === 0 ? (
               <p className="mt-3 rounded-[12px] border border-dashed border-line-strong px-4 py-6 text-center text-sm text-ink-2">
-                {a.queuedTotal ? "Picking up the next job…" : "Nothing is being made right now."}
+                {a.paused && a.queuedTotal ? "On hold. New content resumes when generation is switched back on." : a.queuedTotal ? "Picking up the next job…" : "Nothing is being made right now."}
               </p>
             ) : (
               <ul className="mt-3 space-y-2.5">
