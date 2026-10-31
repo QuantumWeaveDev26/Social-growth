@@ -48,23 +48,27 @@ Customer pages: `/onboarding` (plan → business → brand kit → connect Meta 
 3. AI generation costs the owner's OpenAI/ElevenLabs credit (~$0.14 per post, ~$0.9 per reel, ~$7 for a 26+4 month). Keep generation paused while testing; resume deliberately.
 4. Ask before sending emails or posting to real accounts on the owner's behalf.
 
-## Current state (31 Oct 2026, 14:10 IST)
+## Current state (31 Oct 2026, 18:45 IST)
 
-- Deployed commit: `e5da674` (+ this handoff). Env has `GENERATION_PAUSED=1`, so **AI generation is paused** (admin page has the Resume switch).
-- Meta app **BrandMint AI** id `1435755065405212`, business portfolio `1838532116570701`, in **Development** mode. Use case "Manage everything on your Page" + Instagram permissions added; Facebook Login for Business configuration id `4609074589338735`; keys are in the server env. Live Facebook login worked: customer "AI Full Stack Lab" (owner aifullstacklab.dev@gmail.com) connected Instagram `@aifullstacklab.dev`.
-- AI Full Stack Lab, Starter plan, November 2026: ~19 items made and awaiting approval, ~11 on hold (paused).
-- Admin login password was recreated after the users-table wipe on 28 Oct (see secrets file).
-- Demo customer "Cardamom & Co. Bakery" exists only in the owner's local copy (C:\content-auto\saas), not on the server.
+- Deployed: latest `main` on the VPS. Env still has `GENERATION_PAUSED=1` (AI generation paused).
+- Live posting works: Post now published to the AI Full Stack Lab Facebook Page + @aifullstacklab.dev.
+- Facebook native scheduling: worker (`syncFacebookSchedule` in engine.ts) creates a scheduled Page post (photo uploaded unpublished + `/feed` with `attached_media`, `scheduled_publish_time`) for approved image posts 15 min–28 days ahead → visible in Business Suite → Scheduled. publish_jobs statuses: `meta_scheduled`, `fired`, `cancelled`, `schedule_failed`. Removed on pull back / remake / time change / Post now; `publishDue` checks `is_published` so nothing posts twice. Instagram + reels are worker-published at slot time.
+- Client `/app/schedule`: month calendar (default) + list view. Post now shows "Posting now…" then "Posted" with links.
+- Plans = website: `starter` "Stay Active" ₹3,999 (8+2), `growth` "Reach More Customers" ₹6,999 (12+4), 1 revision per item; `scale` retired by seed. ₹0 7-day free trial (website) NOT built.
+- Admin rebuilt: tabs Overview / Clients (`/admin/customers`, search/filter/sort/paging, `src/lib/adminData.ts`) / Live activity / Failed jobs.
+- Legal: `/terms`, `/refunds` (refund rules are a DRAFT, owner to confirm), signup consent line. Contact page still needs registered address + phone.
+- Docs (Claude Docs, owner's account): Go-live checklist https://claude.ai/artifact/8hEnqT2BUmfyPScdjJQ9iP · AI cost breakdown https://claude.ai/artifact/Bd3oqXtKQ2Vih7SHFcRt7a · Onboarding fields https://claude.ai/artifact/9veWwaGsKCW7RdH3xyTrG2
+- TeamSync project: "BrandMint AI – Social Media Content Automation" (stages, update, decisions, tasks 7–11).
+- AI costs (list prices): image post ≈ $0.15, reel ≈ $0.86, an edit = full remake (same cost). Images at gpt-image-1.5 "high"; gpt-image-1.5 is marked deprecated by OpenAI.
+- brandmintai.io DNS is NOT on this Hostinger account (owner must add records).
 
 ## Next steps (in order)
 
-1. **Live posting test:** owner approves one AI Full Stack Lab post and clicks *Post now*; confirm it lands on the Facebook Page + Instagram; check worker logs for Graph API errors. Owner screen-records it for App Review.
-2. Small fix: Activity "Working on now" says "Picking up the next job…" while paused; show "On hold" instead (`src/components/ActivityPanel.tsx`, use `a.paused`).
-3. Create a reviewer account in BrandMint (e.g. meta-review@… with demo plan and content to approve) for Meta App Review.
-4. Meta: Business Verification → Become a Tech Provider → App Review for pages_show_list, pages_read_engagement, pages_manage_posts, business_management, instagram_basic, instagram_content_publish → Publish (Live). Guide: Claude Docs link above.
-5. Real domain (e.g. app.brandmintai.io → 76.13.217.50): set `APP_HOST`, redeploy, update all URLs in the Meta app.
-6. Razorpay keys (`RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`), test mode first; renewal flow is built (`/app/billing`).
-7. Later: Instagram-only login (needs a second Meta app; `INSTAGRAM_APP_ID/SECRET`), Gemini Omni motion video for reels (needs Gemini billing), performance reports (Growth plan), YouTube/LinkedIn/X publishing, Postgres + S3 when scaling.
+1. Owner adds DNS A record `app.brandmintai.io → 76.13.217.50`; then set `APP_HOST`, redeploy, update Meta app URLs (see Go-live checklist).
+2. Meta Business Verification → reviewer test account (owner OK, ~$1–3 AI) → screencast → App Review (6 permissions) → switch app to Live.
+3. Razorpay KYC + live keys (`RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`); Contact page with address/phone.
+4. Reel editing upgrade (awaiting go-ahead): AI edit-plan playbook, 4 styles, @remotion/transitions, hook/end cards, smart edits (re-render / text-only / single scene). Check Remotion licence (free ≤3 employees).
+5. Small: text-only edits keep the image; schedule calendar should open on the month of the next post (not yet built); free trial; off-site backups; replace gpt-image-1.5.
 
 ## Run locally
 
