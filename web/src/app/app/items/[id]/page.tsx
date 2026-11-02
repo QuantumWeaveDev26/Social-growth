@@ -116,7 +116,7 @@ export default async function ItemPage({ params, searchParams }: { params: Promi
                 <p className="text-sm text-ink-2">{nextToReview ? "Then we take you to the next one." : "This is the last one waiting."}</p>
               </form>
               <div className="mt-6 border-t border-line pt-5">
-                <ChangesForm itemId={id} revLeft={revLeft} />
+                <ChangesForm itemId={id} revLeft={revLeft} reel={item.type === "reel"} />
               </div>
             </div>
           )}

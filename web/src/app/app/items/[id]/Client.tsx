@@ -6,7 +6,7 @@ import { FormError } from "@/components/ui";
 
 const QUICK = ["Make the photo warmer and brighter", "Shorter caption", "Less salesy", "Show the product closer", "Different headline"];
 
-export function ChangesForm({ itemId, revLeft, free = false }: { itemId: string; revLeft: number; free?: boolean }) {
+export function ChangesForm({ itemId, revLeft, free = false, reel = false }: { itemId: string; revLeft: number; free?: boolean; reel?: boolean }) {
   const [state, action] = useActionState(requestChanges, undefined);
   const [text, setText] = useState("");
   const out = !free && revLeft <= 0;
@@ -14,7 +14,7 @@ export function ChangesForm({ itemId, revLeft, free = false }: { itemId: string;
     <form action={action}>
       <input type="hidden" name="itemId" value={itemId} />
       <label htmlFor="comment" className="label">{free ? "What should we do differently?" : "Not quite right? Tell us what to change"}</label>
-      <textarea id="comment" name="comment" rows={3} value={text} onChange={(e) => setText(e.target.value)} disabled={out} className="field" placeholder="Use a photo of the shop front instead, and mention we open at 7am." />
+      <textarea id="comment" name="comment" rows={3} value={text} onChange={(e) => setText(e.target.value)} disabled={out} className="field" placeholder={reel ? "Make it faster and more playful. Or: change scene 3 to show our shop front." : "Use a photo of the shop front instead, and mention we open at 7am."} />
       <div className="mt-2 flex flex-wrap gap-1.5">
         {QUICK.map((q) => (
           <button key={q} type="button" disabled={out} onClick={() => setText((t) => (t ? `${t.replace(/\.?\s*$/, ".")} ${q}.` : `${q}.`))}

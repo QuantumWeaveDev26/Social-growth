@@ -11,3 +11,6 @@ web/.claude/
 web/tsconfig.tsbuildinfo
 video/public/job/
 *.log
+video/public/jobs/
+video/public/sample/
+video/_render.mjs

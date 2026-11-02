@@ -2,6 +2,7 @@ import { CalculateMetadataFunction, Composition } from "remotion";
 import { NaviShort, NaviShortProps } from "./NaviShort";
 import { BrandMintShort, BrandMintProps } from "./BrandMintShort";
 import { ReelShort, ReelShortProps } from "./ReelShort";
+import { ReelPro, ReelProProps, END_SEC } from "./ReelPro";
 
 const FPS = 30;
 
@@ -28,9 +29,18 @@ const bmMetadata: CalculateMetadataFunction<BrandMintProps> = ({ props }) => {
 
 const reelMetadata: CalculateMetadataFunction<ReelShortProps> = ({ props }) => ({ durationInFrames: Math.ceil((props.durationSec + 2) * FPS) });
 
+const reelProMetadata: CalculateMetadataFunction<ReelProProps> = ({ props }) => ({ durationInFrames: Math.ceil((props.durationSec + END_SEC) * FPS) });
+
+const reelProDefaults: ReelProProps = {
+  audio: "job/voice.mp3", durationSec: 10, captions: [], scenes: [], businessName: "Business", handle: null, logo: null,
+  colors: { accent: "#1F8A65", second: "#13221D" },
+  plan: { style: "warm", hook: "", scenes: [], transitions: [], caption_style: "highlight", end_card: { cta: "", line: "" } },
+};
+
 export const MyComposition = () => {
   return (
     <>
+    <Composition id="ReelPro" component={ReelPro} durationInFrames={900} fps={FPS} width={1080} height={1920} defaultProps={reelProDefaults} calculateMetadata={reelProMetadata} />
     <Composition
       id="ReelShort"
       component={ReelShort}

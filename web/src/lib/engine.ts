@@ -16,6 +16,7 @@ import { publishToMeta, platformsFor, MetaError, checkConnection, refreshInstagr
 import { seal, open as openSecret } from "./crypto";
 import { notify } from "./notify";
 import { monthLabel } from "./format";
+import { makeEditPlan, routeChange, type EditPlan, type Route } from "./editing";
 
 const run = promisify(execFile);
 const PB_DIR = path.join(process.cwd(), "src/playbooks/saas");
@@ -214,21 +215,46 @@ async function makeItem(itemId: string, step: StepFn = () => {}) {
   const fb = feedback ? `\nCUSTOMER FEEDBACK (must be applied): ${feedback}` : "";
   const user = `BRIEF:\n${item.brief}\nBRAND COLOURS: ${colours}${prevCopy}${fb}`;
 
-  step(feedback ? "Rewriting with the customer’s note" : "Writing the caption and copy");
-  const draft = await chatJson<Record<string, unknown>>(sys(item.type === "reel" ? "reel" : "post", profile.profileMd), user);
-  addCost(itemId, draft.costUsd);
-  const issues = checks(item.type, draft.data);
-  step("Editing and checking the copy");
-  const edited = await chatJson<Record<string, unknown>>(
-    sys("editor", profile.profileMd),
-    `PACKAGE:\n${JSON.stringify(draft.data)}\nAUTOMATIC CHECK FAILURES:\n${issues.join("\n") || "none"}${fb}`,
-  );
-  addCost(itemId, edited.costUsd);
-  const copy = { ...draft.data, ...edited.data };
+  const prev = item.copy ? (JSON.parse(item.copy) as Record<string, unknown>) : null;
+  const tone = (JSON.parse(c.details || "{}") as { tone?: string }).tone;
+  const prevDir = item.thumbPath ? path.posix.dirname(item.thumbPath) : null;
+
+  // Smart edits: apply the customer's note with the smallest change (restyle / text / voice / some scenes / full)
+  let route: Route = { route: "full", scenes: [], reason: "new item" };
+  if (feedback && prev && prevDir && item.mediaPath) {
+    step("Working out what to change");
+    const r = await routeChange({ system: sys("change_router"), type: item.type === "reel" ? "reel" : "post", note: feedback, copy: prev });
+    addCost(itemId, r.costUsd);
+    route = r.route;
+  }
+
+  let copy: Record<string, unknown>;
+  if (route.route === "restyle" && prev) {
+    copy = { ...prev };
+  } else {
+    step(feedback ? "Rewriting with the customer’s note" : "Writing the caption and copy");
+    const draft = await chatJson<Record<string, unknown>>(sys(item.type === "reel" ? "reel" : "post", profile.profileMd), user);
+    addCost(itemId, draft.costUsd);
+    const issues = checks(item.type, draft.data);
+    step("Editing and checking the copy");
+    const edited = await chatJson<Record<string, unknown>>(
+      sys("editor", profile.profileMd),
+      `PACKAGE:\n${JSON.stringify(draft.data)}\nAUTOMATIC CHECK FAILURES:\n${issues.join("\n") || "none"}${fb}`,
+    );
+    addCost(itemId, edited.costUsd);
+    copy = { ...draft.data, ...edited.data };
+    if (prev && route.route !== "full") copy = keepUnchanged(copy, prev, route, item.type);
+  }
+  copy.last_change = feedback ? { route: route.route, scenes: route.scenes, reason: route.reason, at: new Date().toISOString() } : undefined;
   const logo = await brandLogo(item.customerId);
   const dir = `${item.customerId}/${item.planId}/${itemId}/v${item.revisionCount}`;
 
   if (item.type === "post") {
+    if (route.route === "text" && item.mediaPath) {
+      // caption-only change: keep the picture
+      db.update(schema.contentItems).set({ copy: JSON.stringify(copy), status: "awaiting_approval" }).where(eq(schema.contentItems.id, itemId)).run();
+      return;
+    }
     step("Creating the image");
     const img = await generateImage(String(copy.image_prompt), "1024x1024");
     addCost(itemId, img.costUsd);
@@ -243,10 +269,16 @@ async function makeItem(itemId: string, step: StepFn = () => {}) {
     return;
   }
 
-  // reel: 4 scene images + voiceover + Remotion render
+  // reel: 4 scene images + voiceover + AI edit plan + Remotion render. Parts the note didn't touch are reused.
   const scenes = (copy.scenes as Array<Record<string, string>>) || [];
+  const reuse = (file: string) => (prevDir && route.route !== "full" && fs.existsSync(absPath(`${prevDir}/${file}`)) ? `${prevDir}/${file}` : null);
   const scenePaths: string[] = [];
   for (let i = 0; i < scenes.length; i++) {
+    const old = route.route === "scenes" && route.scenes.includes(i + 1) ? null : reuse(`scene${i + 1}.png`);
+    if (old) {
+      scenePaths.push(copyFile(old, `${dir}/scene${i + 1}.png`));
+      continue;
+    }
     step(`Creating scene ${i + 1} of ${scenes.length}`);
     const img = await generateImage(
       `${scenes[i].visual_prompt} A single vertical 9:16 photograph (one frame, not a collage or grid), realistic, natural light, clear space at top and bottom, absolutely no text, letters or logos.`,
@@ -255,15 +287,35 @@ async function makeItem(itemId: string, step: StepFn = () => {}) {
     addCost(itemId, img.costUsd);
     scenePaths.push(saveFile(`${dir}/scene${i + 1}.png`, img.png));
   }
-  step("Recording the voiceover");
-  const tts = await textToSpeech(String(copy.vo_script));
-  addCost(itemId, tts.costUsd);
-  const voice = saveFile(`${dir}/voice.mp3`, tts.mp3);
+  const sameVoice = prev && String(prev.vo_script || "") === String(copy.vo_script || "");
+  const oldVoice = route.route !== "voice" && sameVoice ? reuse("voice.mp3") : null;
+  const oldAlign = oldVoice ? reuse("alignment.json") : null;
+  let voice: string;
+  let alignment: Alignment;
+  if (oldVoice && oldAlign) {
+    voice = copyFile(oldVoice, `${dir}/voice.mp3`);
+    alignment = JSON.parse(fs.readFileSync(absPath(oldAlign), "utf8"));
+  } else {
+    step("Recording the voiceover");
+    const tts = await textToSpeech(String(copy.vo_script));
+    addCost(itemId, tts.costUsd);
+    voice = saveFile(`${dir}/voice.mp3`, tts.mp3);
+    alignment = tts.alignment;
+  }
+  saveFile(`${dir}/alignment.json`, Buffer.from(JSON.stringify(alignment)));
+
+  step("Planning the edit");
+  const ep = await makeEditPlan({ system: sys("reel_editor", profile.profileMd), copy, tone, feedback, previous: prev?.edit_plan });
+  addCost(itemId, ep.costUsd);
+  copy.edit_plan = ep.plan;
+
   const thumb = scenePaths[0];
   let mp4: string | null = null;
   try {
     step("Rendering the video");
-    mp4 = await renderReel({ dir, scenePaths, voice, alignment: tts.alignment, scenes, cover: String(copy.cover_text || ""), brand: c, logo });
+    const conn = db.select().from(schema.metaConnections).where(eq(schema.metaConnections.customerId, item.customerId)).get();
+    mp4 = await renderReel({ itemId, dir, scenePaths, voice, alignment, scenes, plan: ep.plan, brand: c, logo, handle: conn?.igUsername ?? null });
+    delete copy.render_error;
   } catch (e) {
     copy.render_error = String(e).slice(0, 400);
   }
@@ -271,6 +323,38 @@ async function makeItem(itemId: string, step: StepFn = () => {}) {
     .set({ copy: JSON.stringify(copy), mediaPath: mp4 || thumb, thumbPath: thumb, status: mp4 ? "awaiting_approval" : "failed", error: mp4 ? null : "Video render failed" })
     .where(eq(schema.contentItems.id, itemId))
     .run();
+}
+
+/** For partial edits, keep the parts the route says must not change (pictures, voice, words on a post image). */
+function keepUnchanged(next: Record<string, unknown>, prev: Record<string, unknown>, route: Route, type: string) {
+  const out = { ...next };
+  if (type === "post") {
+    out.image_prompt = prev.image_prompt;
+    out.on_image_text = prev.on_image_text;
+    if ("sub_text" in prev) out.sub_text = prev.sub_text;
+    out.alt_text = prev.alt_text;
+    return out;
+  }
+  const ps = (prev.scenes as Array<Record<string, string>>) || [];
+  const ns = (next.scenes as Array<Record<string, string>>) || [];
+  out.scenes = ps.map((p, i) => {
+    const n = ns[i] || p;
+    const newPicture = route.route === "scenes" && route.scenes.includes(i + 1);
+    return {
+      ...n,
+      visual_prompt: newPicture ? n.visual_prompt || p.visual_prompt : p.visual_prompt,
+      spoken: route.route === "voice" ? n.spoken || p.spoken : p.spoken,
+    };
+  });
+  if (route.route !== "voice") out.vo_script = prev.vo_script;
+  return out;
+}
+
+function copyFile(fromRel: string, toRel: string) {
+  if (fromRel === toRel) return toRel;
+  fs.mkdirSync(path.dirname(absPath(toRel)), { recursive: true });
+  fs.copyFileSync(absPath(fromRel), absPath(toRel));
+  return toRel;
 }
 
 // ---------------------------------------------------------------- reel render (Remotion)
@@ -292,49 +376,55 @@ function wordsFromAlignment(a: Alignment) {
 }
 
 async function renderReel(o: {
-  dir: string; scenePaths: string[]; voice: string; alignment: Alignment; scenes: Array<Record<string, string>>;
-  cover: string; brand: typeof schema.customers.$inferSelect; logo: string | null;
+  itemId: string; dir: string; scenePaths: string[]; voice: string; alignment: Alignment; scenes: Array<Record<string, string>>;
+  plan: EditPlan; brand: typeof schema.customers.$inferSelect; logo: string | null; handle: string | null;
 }) {
   const videoDir = process.env.VIDEO_DIR || path.resolve(process.cwd(), "../video");
   const words = wordsFromAlignment(o.alignment);
   const norm = (w: string) => w.toLowerCase().replace(/[^a-z0-9']/g, "");
   const nw = words.map((w) => norm(w.text));
   let ptr = 0;
-  const beats = o.scenes.map((s, i) => {
+  // each render gets its own folder so two reels can render at the same time
+  const job = `jobs/${o.itemId}`;
+  const scenes = o.scenes.map((s, i) => {
     const key = String(s.spoken || "").split(/\s+/).map(norm).filter(Boolean).slice(0, 2);
     let at = -1;
     for (let k = ptr; k < nw.length && key.length; k++) if (nw[k] === key[0] && (key.length < 2 || nw[k + 1] === key[1])) { at = k; break; }
     if (at < 0) at = Math.min(nw.length - 1, Math.round((i * nw.length) / o.scenes.length));
     ptr = at + 1;
-    return { startSec: i === 0 ? 0 : words[at]?.start ?? i * 6, text: String(s.on_screen_text || ""), image: `job/scene${i + 1}.png` };
+    return { startSec: i === 0 ? 0 : words[at]?.start ?? i * 6, text: String(s.on_screen_text || ""), image: `${job}/scene${i + 1}.png` };
   });
-  // stage assets into the Remotion public folder
-  const jobPublic = path.join(videoDir, "public", "job");
+  const jobPublic = path.join(videoDir, "public", job);
   fs.rmSync(jobPublic, { recursive: true, force: true });
   fs.mkdirSync(jobPublic, { recursive: true });
-  o.scenePaths.forEach((p, i) => fs.copyFileSync(absPath(p), path.join(jobPublic, `scene${i + 1}.png`)));
-  fs.copyFileSync(absPath(o.voice), path.join(jobPublic, "voice.mp3"));
-  if (o.logo) fs.copyFileSync(o.logo, path.join(jobPublic, "logo.png"));
-  const colours = JSON.parse(o.brand.brandColors || "[]") as string[];
-  const props = {
-    audio: "job/voice.mp3",
-    durationSec: words.length ? words[words.length - 1].end : 25,
-    beats,
-    captions: words.map((w, i) => ({ text: (i ? " " : "") + w.text, startMs: Math.round(w.start * 1000), endMs: Math.round(w.end * 1000), timestampMs: null, confidence: null })),
-    businessName: o.brand.businessName,
-    cover: o.cover,
-    accent: colours[0] || "#1F8A65",
-    logo: o.logo ? "job/logo.png" : null,
-  };
-  const propsFile = path.join(jobPublic, "props.json");
-  fs.writeFileSync(propsFile, JSON.stringify(props));
-  const outRel = `${o.dir}/reel.mp4`;
-  const outAbs = path.join(STORAGE_ROOT, outRel);
-  fs.mkdirSync(path.dirname(outAbs), { recursive: true });
-  const args = ["remotion", "render", "ReelShort", outAbs, `--props=${propsFile}`, "--codec=h264", "--crf=20", "--x264-preset=veryfast"];
-  if (process.env.REMOTION_BROWSER) args.push(`--browser-executable=${process.env.REMOTION_BROWSER}`);
-  await run("npx", args, { cwd: videoDir, timeout: 15 * 60_000, maxBuffer: 20 * 1024 * 1024, shell: process.platform === "win32" });
-  return outRel;
+  try {
+    o.scenePaths.forEach((p, i) => fs.copyFileSync(absPath(p), path.join(jobPublic, `scene${i + 1}.png`)));
+    fs.copyFileSync(absPath(o.voice), path.join(jobPublic, "voice.mp3"));
+    if (o.logo) fs.copyFileSync(o.logo, path.join(jobPublic, "logo.png"));
+    const colours = JSON.parse(o.brand.brandColors || "[]") as string[];
+    const props = {
+      audio: `${job}/voice.mp3`,
+      durationSec: words.length ? words[words.length - 1].end : 25,
+      captions: words.map((w, i) => ({ text: (i ? " " : "") + w.text, startMs: Math.round(w.start * 1000), endMs: Math.round(w.end * 1000), timestampMs: null, confidence: null })),
+      scenes,
+      businessName: o.brand.businessName,
+      handle: o.handle,
+      logo: o.logo ? `${job}/logo.png` : null,
+      colors: { accent: colours[0] || "#1F8A65", second: colours[1] || "#E8B04A" },
+      plan: o.plan,
+    };
+    const propsFile = path.join(jobPublic, "props.json");
+    fs.writeFileSync(propsFile, JSON.stringify(props));
+    const outRel = `${o.dir}/reel.mp4`;
+    const outAbs = path.join(STORAGE_ROOT, outRel);
+    fs.mkdirSync(path.dirname(outAbs), { recursive: true });
+    const args = ["remotion", "render", "ReelPro", outAbs, `--props=${propsFile}`, "--codec=h264", "--crf=20", "--x264-preset=veryfast"];
+    if (process.env.REMOTION_BROWSER) args.push(`--browser-executable=${process.env.REMOTION_BROWSER}`);
+    await run("npx", args, { cwd: videoDir, timeout: 15 * 60_000, maxBuffer: 20 * 1024 * 1024, shell: process.platform === "win32" });
+    return outRel;
+  } finally {
+    fs.rmSync(jobPublic, { recursive: true, force: true });
+  }
 }
 
 // ---------------------------------------------------------------- publishing
