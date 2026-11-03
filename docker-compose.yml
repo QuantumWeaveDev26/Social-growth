@@ -47,6 +47,16 @@ services:
       traefik.http.routers.brandmint.tls: "true"
       traefik.http.routers.brandmint.tls.certresolver: mytlschallenge
       traefik.http.services.brandmint.loadbalancer.server.port: "3000"
+      # old address (LEGACY_HOST) permanently redirects to APP_HOST
+      traefik.http.routers.brandmint-legacy.rule: "Host(`${LEGACY_HOST}`)"
+      traefik.http.routers.brandmint-legacy.entrypoints: websecure
+      traefik.http.routers.brandmint-legacy.tls: "true"
+      traefik.http.routers.brandmint-legacy.tls.certresolver: mytlschallenge
+      traefik.http.routers.brandmint-legacy.middlewares: brandmint-to-app
+      traefik.http.routers.brandmint-legacy.service: brandmint
+      traefik.http.middlewares.brandmint-to-app.redirectregex.regex: "^https?://[^/]+/(.*)"
+      traefik.http.middlewares.brandmint-to-app.redirectregex.replacement: "https://${APP_HOST}/$${1}"
+      traefik.http.middlewares.brandmint-to-app.redirectregex.permanent: "true"
   worker:
     <<: *app
     command: ["worker"]
