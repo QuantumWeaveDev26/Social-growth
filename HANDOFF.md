@@ -6,8 +6,8 @@ Read this first if you are a new Claude session picking up this project. Secrets
 
 A SaaS for Indian small businesses: the customer buys a monthly plan, describes the business, connects Facebook + Instagram, and BrandMint AI writes a brand profile, plans the month, makes every post and reel, waits for the customer's approval, then publishes on schedule.
 
-- Live (temporary domain): https://brandmint.76.13.217.50.sslip.io
-- Admin: https://brandmint.76.13.217.50.sslip.io/admin (login in the secrets file)
+- Live: https://app.brandmintai.io (since 3 Nov 2026; DNS A record on the owner's other Hostinger account). The old https://brandmint.76.13.217.50.sslip.io redirects there (env LEGACY_HOST).
+- Admin: https://app.brandmintai.io/admin (login in the secrets file)
 - Repo: https://github.com/QuantumWeaveDev26/Social-growth (branch `main`)
 - Meta app setup guide (Claude Docs): https://claude.ai/artifact/Ag1z8JoBacm5tGQGZJMaWT
 
@@ -64,7 +64,7 @@ Customer pages: `/onboarding` (plan → business → brand kit → connect Meta 
 
 ## Next steps (in order)
 
-1. Owner adds DNS A record `app.brandmintai.io → 76.13.217.50`; then set `APP_HOST`, redeploy, update Meta app URLs (see Go-live checklist).
+1. DONE 3 Nov: app.brandmintai.io live (APP_HOST=app.brandmintai.io, LEGACY_HOST=old sslip host). Email now via n8n SMTP credential "BrandMint SMTP" (Gmail OAuth creds expire every 7 days). Owner must update Meta app URLs to app.brandmintai.io.
 2. Meta Business Verification → reviewer test account (owner OK, ~$1–3 AI) → screencast → App Review (6 permissions) → switch app to Live.
 3. Razorpay KYC + live keys (`RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`); Contact page with address/phone.
 4. Reel editing upgrade (awaiting go-ahead): AI edit-plan playbook, 4 styles, @remotion/transitions, hook/end cards, smart edits (re-render / text-only / single scene). Check Remotion licence (free ≤3 employees).
