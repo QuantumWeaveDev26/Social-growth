@@ -9,6 +9,7 @@ import { buildBrandProfile, planMonth, generateItem, publishDue, syncConnections
 import { db, schema } from "../src/db";
 import { deliverNotification } from "../src/lib/notify";
 import { runDaily } from "../src/lib/cycle";
+import { runVeoTest } from "../src/lib/veo";
 import { eq } from "drizzle-orm";
 
 const CONCURRENCY = Number(process.env.WORKER_CONCURRENCY || 3);
@@ -23,6 +24,7 @@ async function handle(job: NonNullable<ReturnType<typeof claimNext>>) {
     else if (job.type === "generate_item") await generateItem(p.itemId, step);
     else if (job.type === "publish_due") await publishDue();
     else if (job.type === "send_email") await deliverNotification(p.notificationId, p.cta);
+    else if (job.type === "veo_test") await runVeoTest(p.customerId);
     finishJob(job.id);
     console.log(new Date().toISOString(), "done", job.type, job.id);
   } catch (e) {

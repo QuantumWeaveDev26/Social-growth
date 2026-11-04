@@ -16,6 +16,7 @@ import { publishToMeta, platformsFor, MetaError, checkConnection, refreshInstagr
 import { seal, open as openSecret } from "./crypto";
 import { notify } from "./notify";
 import { monthLabel } from "./format";
+import { veoFor, imageToVideo, motionPrompt } from "./veo";
 
 const run = promisify(execFile);
 const PB_DIR = path.join(process.cwd(), "src/playbooks/saas");
@@ -255,6 +256,23 @@ async function makeItem(itemId: string, step: StepFn = () => {}) {
     addCost(itemId, img.costUsd);
     scenePaths.push(saveFile(`${dir}/scene${i + 1}.png`, img.png));
   }
+  // optional: turn each still into a real moving clip with Veo (falls back to the still if a clip fails)
+  const clipPaths: (string | null)[] = scenePaths.map(() => null);
+  if (veoFor(item.customerId)) {
+    for (let i = 0; i < scenePaths.length; i++) {
+      step(`Filming scene ${i + 1} of ${scenePaths.length} (Veo)`);
+      try {
+        const v = await imageToVideo(absPath(scenePaths[i]), motionPrompt(String(scenes[i].visual_prompt || "")), {
+          onWait: (sec) => step(`Filming scene ${i + 1} of ${scenePaths.length} (Veo, ${sec}s)`),
+        });
+        addCost(itemId, v.costUsd);
+        clipPaths[i] = saveFile(`${dir}/scene${i + 1}.mp4`, v.mp4);
+      } catch (e) {
+        console.error(`veo scene ${i + 1} for ${itemId}:`, e instanceof Error ? e.message : e);
+        copy.veo_errors = [...((copy.veo_errors as string[]) || []), `scene ${i + 1}: ${String(e).slice(0, 200)}`];
+      }
+    }
+  }
   step("Recording the voiceover");
   const tts = await textToSpeech(String(copy.vo_script));
   addCost(itemId, tts.costUsd);
@@ -263,7 +281,7 @@ async function makeItem(itemId: string, step: StepFn = () => {}) {
   let mp4: string | null = null;
   try {
     step("Rendering the video");
-    mp4 = await renderReel({ dir, scenePaths, voice, alignment: tts.alignment, scenes, cover: String(copy.cover_text || ""), brand: c, logo });
+    mp4 = await renderReel({ dir, scenePaths, clipPaths, voice, alignment: tts.alignment, scenes, cover: String(copy.cover_text || ""), brand: c, logo });
   } catch (e) {
     copy.render_error = String(e).slice(0, 400);
   }
@@ -292,7 +310,7 @@ function wordsFromAlignment(a: Alignment) {
 }
 
 async function renderReel(o: {
-  dir: string; scenePaths: string[]; voice: string; alignment: Alignment; scenes: Array<Record<string, string>>;
+  dir: string; scenePaths: string[]; clipPaths?: (string | null)[]; voice: string; alignment: Alignment; scenes: Array<Record<string, string>>;
   cover: string; brand: typeof schema.customers.$inferSelect; logo: string | null;
 }) {
   const videoDir = process.env.VIDEO_DIR || path.resolve(process.cwd(), "../video");
@@ -306,13 +324,14 @@ async function renderReel(o: {
     for (let k = ptr; k < nw.length && key.length; k++) if (nw[k] === key[0] && (key.length < 2 || nw[k + 1] === key[1])) { at = k; break; }
     if (at < 0) at = Math.min(nw.length - 1, Math.round((i * nw.length) / o.scenes.length));
     ptr = at + 1;
-    return { startSec: i === 0 ? 0 : words[at]?.start ?? i * 6, text: String(s.on_screen_text || ""), image: `job/scene${i + 1}.png` };
+    return { startSec: i === 0 ? 0 : words[at]?.start ?? i * 6, text: String(s.on_screen_text || ""), image: `job/scene${i + 1}.png`, video: o.clipPaths?.[i] ? `job/scene${i + 1}.mp4` : null };
   });
   // stage assets into the Remotion public folder
   const jobPublic = path.join(videoDir, "public", "job");
   fs.rmSync(jobPublic, { recursive: true, force: true });
   fs.mkdirSync(jobPublic, { recursive: true });
   o.scenePaths.forEach((p, i) => fs.copyFileSync(absPath(p), path.join(jobPublic, `scene${i + 1}.png`)));
+  o.clipPaths?.forEach((p, i) => { if (p) fs.copyFileSync(absPath(p), path.join(jobPublic, `scene${i + 1}.mp4`)); });
   fs.copyFileSync(absPath(o.voice), path.join(jobPublic, "voice.mp3"));
   if (o.logo) fs.copyFileSync(o.logo, path.join(jobPublic, "logo.png"));
   const colours = JSON.parse(o.brand.brandColors || "[]") as string[];

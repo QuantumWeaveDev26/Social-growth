@@ -10,7 +10,9 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { daysLeft } from "@/lib/billing";
 import { currentMonth, nextMonth, fmtDateTime, inr, monthLabel } from "@/lib/format";
 import { mediaUrl } from "@/lib/storage";
-import { adminChangePlan, adminExtend, adminSetStatus, adminRetryFailed, adminReleaseHeld, adminPlanMonth, adminRebuildProfile, adminAttachOwner, adminAllowGeneration } from "./actions";
+import { adminChangePlan, adminExtend, adminSetStatus, adminRetryFailed, adminReleaseHeld, adminPlanMonth, adminRebuildProfile, adminAttachOwner, adminAllowGeneration, adminSetVeo, adminVeoTest } from "./actions";
+import { veoConfigured, veoFor, veoTestResult } from "@/lib/veo";
+import { AutoRefresh } from "@/components/AutoRefresh";
 import { generationPaused, generationAllowList } from "@/lib/jobs";
 
 export const metadata = { title: "Customer" };
@@ -105,6 +107,26 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
             </form>
             <form action={adminRetryFailed} className="mt-2"><Hidden /><SubmitButton className="btn btn-ghost w-full" pending="Retrying" disabled={!failed.length}>Retry {failed.length} failed item{failed.length === 1 ? "" : "s"}</SubmitButton></form>
             <form action={adminReleaseHeld} className="mt-2"><Hidden /><SubmitButton className="btn btn-ghost w-full" pending="Releasing" disabled={!held}>Release {held} on-hold item{held === 1 ? "" : "s"}</SubmitButton></form>
+            {veoConfigured() && (() => {
+              const on = veoFor(id); const t = veoTestResult(id); const busy = t && ["queued", "running"].includes(t.status);
+              return (
+                <div className="mt-4 border-t border-line pt-4">
+                  <p className="text-sm font-semibold">Veo video (Google Cloud)</p>
+                  <form action={adminSetVeo} className="mt-2"><Hidden /><input type="hidden" name="on" value={on ? "0" : "1"} />
+                    <SubmitButton className="btn btn-ghost w-full" pending="Saving">{on ? "Reels use Veo: on (switch off)" : "Use Veo moving clips for reels"}</SubmitButton>
+                  </form>
+                  <form action={adminVeoTest} className="mt-2"><Hidden /><SubmitButton className="btn btn-ghost w-full" pending="Queued" disabled={!!busy}>Film one test clip (~$0.64)</SubmitButton></form>
+                  {t && (
+                    <div className="mt-2 text-sm text-ink-2">
+                      <AutoRefresh active={!!busy} />
+                      {busy ? `Filming… ${t.waited ? `${t.waited}s` : "starting"}` : t.status === "done" && t.path ? (
+                        <><video src={mediaUrl(t.path)!} controls className="mt-1 w-full rounded-[10px]" /><span className="tnum">{t.model} · ${t.costUsd?.toFixed(2)}</span></>
+                      ) : <span className="text-red">Test failed: {t.error}</span>}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </section>
         </div>
 

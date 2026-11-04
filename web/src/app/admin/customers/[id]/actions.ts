@@ -108,3 +108,22 @@ export async function adminAllowGeneration(fd: FormData) {
   setGenerationAllowed(id, fd.get("on") === "1");
   back(id);
 }
+
+/** Reels for this client use Veo moving clips instead of still images. */
+export async function adminSetVeo(fd: FormData) {
+  await requireAdmin();
+  const id = String(fd.get("customerId"));
+  const { setVeoFor } = await import("@/lib/veo");
+  setVeoFor(id, fd.get("on") === "1");
+  back(id);
+}
+
+/** Films one test clip (about $0.64) from this client's latest image. Runs even while AI generation is paused. */
+export async function adminVeoTest(fd: FormData) {
+  await requireAdmin();
+  const id = String(fd.get("customerId"));
+  db.insert(schema.kv).values({ key: `veo_test:${id}`, value: JSON.stringify({ status: "queued", at: Date.now() }) })
+    .onConflictDoUpdate({ target: schema.kv.key, set: { value: JSON.stringify({ status: "queued", at: Date.now() }) } }).run();
+  enqueue("veo_test", { customerId: id }, { customerId: id });
+  back(id);
+}

@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { AbsoluteFill, Easing, Img, Sequence, interpolate, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
-import { Audio } from "@remotion/media";
+import { Audio, Video } from "@remotion/media";
 import { loadFont } from "@remotion/fonts";
 import { createTikTokStyleCaptions } from "@remotion/captions";
 import type { Caption, TikTokPage } from "@remotion/captions";
@@ -8,7 +8,8 @@ import type { Caption, TikTokPage } from "@remotion/captions";
 const FONT = "Poppins";
 [500, 700, 800].forEach((w) => loadFont({ family: FONT, url: staticFile(`fonts/poppins-latin-${w}-normal.woff2`), weight: String(w) }));
 
-export type ReelBeat = { startSec: number; text: string; image: string };
+export type ReelBeat = { startSec: number; text: string; image: string; video?: string | null };
+const CLIP_SEC = 8; // Veo clip length
 export type ReelShortProps = {
   audio: string;
   durationSec: number;
@@ -28,7 +29,12 @@ const Scene: React.FC<{ beat: ReelBeat; accent: string; len: number }> = ({ beat
   const { fps } = useVideoConfig();
   return (
     <AbsoluteFill>
-      <Img src={staticFile(beat.image)} style={{ width: "100%", height: "100%", objectFit: "cover", scale: interpolate(frame, [0, len], [1.03, 1.13], clamp) }} />
+      {beat.video ? (
+        // real motion clip: slowed down slightly if the beat is longer than the clip, so it never freezes
+        <Video src={staticFile(beat.video)} muted objectFit="cover" playbackRate={Math.min(1, Math.max(0.5, (CLIP_SEC * fps) / Math.max(1, len)))} style={{ width: "100%", height: "100%" }} />
+      ) : (
+        <Img src={staticFile(beat.image)} style={{ width: "100%", height: "100%", objectFit: "cover", scale: interpolate(frame, [0, len], [1.03, 1.13], clamp) }} />
+      )}
       <AbsoluteFill style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0) 32%, rgba(0,0,0,0) 58%, rgba(0,0,0,0.6) 100%)" }} />
       {beat.text && (
         <div style={{ position: "absolute", top: 170, left: 80, right: 80, display: "flex", justifyContent: "center" }}>
