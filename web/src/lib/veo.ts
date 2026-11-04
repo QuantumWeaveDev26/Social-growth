@@ -75,6 +75,24 @@ async function call<T>(url: string, body: unknown): Promise<T> {
   return j as T;
 }
 
+// ---------------------------------------------------------------- Imagen (images on the same Google Cloud project)
+export const IMAGEN_MODEL = process.env.IMAGEN_MODEL || "imagen-4.0-generate-001";
+const IMAGEN_PRICE = Number(process.env.IMAGEN_PRICE || (IMAGEN_MODEL.includes("fast") ? 0.02 : IMAGEN_MODEL.includes("ultra") ? 0.06 : 0.04));
+
+/** Photorealistic image from Imagen 4. aspect: "1:1" | "3:4" | "4:3" | "9:16" | "16:9". */
+export async function imagenImage(prompt: string, aspect: "1:1" | "3:4" | "4:3" | "9:16" | "16:9") {
+  const k = sa();
+  if (!k) throw new Error("Google image generation isn't configured (GOOGLE_SA_JSON_B64 missing)");
+  const url = `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${k.project_id}/locations/${LOCATION}/publishers/google/models/${IMAGEN_MODEL}:predict`;
+  const r = await call<{ predictions?: Array<{ bytesBase64Encoded?: string; raiFilteredReason?: string }> }>(url, {
+    instances: [{ prompt }],
+    parameters: { sampleCount: 1, aspectRatio: aspect, personGeneration: "allow_adult", sampleImageSize: "2K", enhancePrompt: true, outputOptions: { mimeType: "image/png" } },
+  });
+  const p0 = r.predictions?.[0];
+  if (!p0?.bytesBase64Encoded) throw new Error(`Imagen returned no image${p0?.raiFilteredReason ? `: ${p0.raiFilteredReason}` : " (blocked by safety filters)"}`);
+  return { png: Buffer.from(p0.bytesBase64Encoded, "base64"), costUsd: IMAGEN_PRICE };
+}
+
 /**
  * Turns one still image into a vertical clip. Returns the MP4 bytes and its list-price cost.
  * Waits for Google's long-running operation (usually 1–3 minutes).

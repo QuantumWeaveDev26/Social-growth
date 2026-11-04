@@ -144,7 +144,7 @@ function checks(type: string, p: Record<string, unknown>) {
   const igTags = (String(p.instagram_caption || "").match(/#\w+/g) || []).length;
   if (igTags < 3 || igTags > 5) issues.push(`Instagram has ${igTags} hashtags, needs 3-5`);
   if (type === "post" && (wc(p.on_image_text) < 2 || wc(p.on_image_text) > 8)) issues.push("on_image_text must be 3-8 words");
-  if (type === "reel" && (wc(p.vo_script) < 40 || wc(p.vo_script) > 85)) issues.push("vo_script must be 50-75 words");
+  if (type === "reel" && (wc(p.vo_script) < 72 || wc(p.vo_script) > 88)) issues.push(`vo_script has ${wc(p.vo_script)} words; it must be 75-85 spoken words (numbers written as words) so the reel runs about 30 seconds`);
   if (type === "reel") {
     const sc = (p.scenes as Array<Record<string, unknown>>) || [];
     if (sc.length !== 4) issues.push("reel needs exactly 4 scenes");
@@ -257,32 +257,31 @@ async function makeItem(itemId: string, step: StepFn = () => {}) {
 
   // reel: 4 scene images + voiceover + Remotion render
   const scenes = (copy.scenes as Array<Record<string, string>>) || [];
-  const scenePaths: string[] = [];
-  for (let i = 0; i < scenes.length; i++) {
-    step(`Creating scene ${i + 1} of ${scenes.length}`);
-    const img = await generateImage(
-      `${scenes[i].visual_prompt} A single vertical 9:16 photograph (one frame, not a collage or grid), realistic, natural light, clear space at top and bottom, absolutely no text, letters or logos.`,
-      "1024x1536",
-    );
-    addCost(itemId, img.costUsd);
-    scenePaths.push(saveFile(`${dir}/scene${i + 1}.png`, img.png));
-  }
-  // optional: turn each still into a real moving clip with Veo (falls back to the still if a clip fails)
+  // all scene images at once, then all Veo clips at once (much faster than one by one)
+  step(`Creating ${scenes.length} scene images`);
+  const imgs = await Promise.all(scenes.map((sc) => generateImage(
+    `${sc.visual_prompt} A single vertical 9:16 photograph (one frame, not a collage or grid), photorealistic, natural light, real Indian setting, clear space at top and bottom, absolutely no text, letters or logos.`,
+    "1024x1536",
+  )));
+  const scenePaths = imgs.map((img, i) => { addCost(itemId, img.costUsd); return saveFile(`${dir}/scene${i + 1}.png`, img.png); });
   const clipPaths: (string | null)[] = scenePaths.map(() => null);
   if (veoFor(item.customerId)) {
-    for (let i = 0; i < scenePaths.length; i++) {
-      step(`Filming scene ${i + 1} of ${scenePaths.length} (Veo)`);
+    const waited: number[] = scenePaths.map(() => 0);
+    const done: boolean[] = scenePaths.map(() => false);
+    const report = () => step(`Filming ${scenePaths.length} scenes with Veo (${done.filter(Boolean).length} done, ${Math.max(...waited)}s)`);
+    report();
+    await Promise.all(scenePaths.map(async (sp, i) => {
       try {
-        const v = await imageToVideo(absPath(scenePaths[i]), motionPrompt(String(scenes[i].visual_prompt || ""), String(scenes[i].motion || "")), {
-          onWait: (sec) => step(`Filming scene ${i + 1} of ${scenePaths.length} (Veo, ${sec}s)`),
+        const v = await imageToVideo(absPath(sp), motionPrompt(String(scenes[i].visual_prompt || ""), String(scenes[i].motion || "")), {
+          onWait: (sec) => { waited[i] = sec; report(); },
         });
         addCost(itemId, v.costUsd);
         clipPaths[i] = saveFile(`${dir}/scene${i + 1}.mp4`, v.mp4);
       } catch (e) {
         console.error(`veo scene ${i + 1} for ${itemId}:`, e instanceof Error ? e.message : e);
         copy.veo_errors = [...((copy.veo_errors as string[]) || []), `scene ${i + 1}: ${String(e).slice(0, 200)}`];
-      }
-    }
+      } finally { done[i] = true; report(); }
+    }));
   }
   step("Recording the voiceover");
   const tts = await textToSpeech(String(copy.vo_script));

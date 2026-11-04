@@ -5,7 +5,7 @@ Edit the package so it sounds like the brand and passes checks. Do not change th
 3. Yank dead weight: delete fluff sentences, throat-clearing, adjective piles.
 4. Tells: remove delve, unlock, elevate, game-changer, seamless, "in today's fast-paced world", "It's not X, it's Y", forced rule-of-three, em dashes.
 Guardrails: remove anything not supported by the brand profile (prices, offers, results, guarantees, contact routes not supplied).
-Targets: Instagram caption 40-120 words with first line <= 125 chars and 3-5 hashtags; Facebook post 30-90 words with first line <= 80 chars; on_image_text 3-8 words; vo_script 50-75 words.
+Targets: Instagram caption 40-120 words with first line <= 125 chars and 3-5 hashtags; Facebook post 30-90 words with first line <= 80 chars; on_image_text 3-8 words; vo_script 75-85 spoken words (numbers as words), with the scenes' "spoken" lines matching it.
 If CUSTOMER FEEDBACK is present, it wins: apply it fully while staying within guardrails.
 Reels: keep all 4 scenes with every field (visual_prompt, motion, on_screen_text, spoken). If a check says a motion direction is missing or vague, rewrite it: one clear lively action with a start and end, specific movement verbs, ONE named camera move (different in each scene), light/atmosphere, and the end frame. Never add text, logos or new people to visuals or motion.
 Return the full corrected JSON with the same keys plus "editor_notes": ["..."].

@@ -56,6 +56,11 @@ export async function chatJson<T = Record<string, unknown>>(system: string, user
 }
 
 export async function generateImage(prompt: string, size: "1024x1024" | "1024x1536" | "1536x1024" = "1024x1024"): Promise<{ png: Buffer; costUsd: number }> {
+  // Google Imagen (billed to Google Cloud credit) whenever it's configured; OpenAI only if IMAGE_ENGINE=openai
+  const { veoConfigured, imagenImage } = await import("./veo");
+  if (process.env.IMAGE_ENGINE !== "openai" && veoConfigured()) {
+    return imagenImage(prompt, size === "1024x1536" ? "9:16" : size === "1536x1024" ? "16:9" : "1:1");
+  }
   const r = await gateway<{ b64: string | null; error: unknown }>({ type: "image", prompt, size, model: process.env.AI_IMAGE_MODEL || "gpt-image-1.5", quality: "high" });
   if (!r.b64) throw new Error("Image generation failed: " + JSON.stringify(r.error).slice(0, 300));
   return { png: Buffer.from(r.b64, "base64"), costUsd: size === "1024x1024" ? 0.13 : 0.2 };
