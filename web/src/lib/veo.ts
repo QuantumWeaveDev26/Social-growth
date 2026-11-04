@@ -81,8 +81,10 @@ async function call<T>(url: string, body: unknown): Promise<T> {
  */
 export async function imageToVideo(imagePath: string, prompt: string, o: { seconds?: number; onWait?: (s: number) => void } = {}) {
   const seconds = [4, 6, 8].includes(o.seconds ?? CLIP_SECONDS) ? (o.seconds ?? CLIP_SECONDS) : 8;
-  const img = fs.readFileSync(imagePath).toString("base64");
-  const mimeType = imagePath.toLowerCase().endsWith(".jpg") || imagePath.toLowerCase().endsWith(".jpeg") ? "image/jpeg" : "image/png";
+  // crop to an exact 9:16 frame first, so Veo fills the screen instead of adding black bars
+  const sharp = (await import("sharp")).default;
+  const img = (await sharp(fs.readFileSync(imagePath)).resize(1080, 1920, { fit: "cover", position: "attention" }).jpeg({ quality: 92 }).toBuffer()).toString("base64");
+  const mimeType = "image/jpeg";
   const op = await call<{ name: string }>(`${base()}:predictLongRunning`, {
     instances: [{ prompt, image: { bytesBase64Encoded: img, mimeType } }],
     parameters: { aspectRatio: "9:16", durationSeconds: seconds, resolution: RESOLUTION, generateAudio: false, sampleCount: 1, personGeneration: "allow_adult", enhancePrompt: true },
@@ -109,7 +111,7 @@ export async function imageToVideo(imagePath: string, prompt: string, o: { secon
 
 /** Motion direction for a scene, built from its still-image description. */
 export const motionPrompt = (visual: string) =>
-  `Animate this exact photograph into a realistic, smooth vertical video. Keep the same people, products, place, colours and lighting. ` +
+  `Animate this exact photograph into a realistic, smooth vertical video. Keep exactly the same people, hands, products, place, colours and lighting; do not add any new people, body parts or objects. ` +
   `Gentle cinematic camera movement (slow push-in or subtle pan) with natural motion in the scene: ${visual}. ` +
   `Photorealistic, steady, no cuts, no new objects, no text, letters, captions, logos or watermarks.`;
 
