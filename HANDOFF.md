@@ -65,7 +65,7 @@ Customer pages: `/onboarding` (plan → business → brand kit → connect Meta 
 ## Next steps (in order)
 
 1. DONE 3 Nov: app.brandmintai.io live (APP_HOST=app.brandmintai.io, LEGACY_HOST=old sslip host). Email now via n8n SMTP credential "BrandMint SMTP" (Gmail OAuth creds expire every 7 days). Owner must update Meta app URLs to app.brandmintai.io.
-2. Meta Business Verification → reviewer test account (owner OK, ~$1–3 AI) → screencast → App Review (6 permissions) → switch app to Live.
+2. 4 Nov: Business verified; app Published (Live); App Review SUBMITTED for the 6 permissions (pages_show_list, pages_read_engagement, pages_manage_posts, business_management, instagram_basic, instagram_content_publish). Reviewer login reviewer@brandmintai.io (client "Chai Corner"). Until approved, only app-role users can connect. Don't change reviewer account or Login settings while pending. Admin has a per-client "Allow AI while paused" switch (kv generation_allow).
 3. Razorpay KYC + live keys (`RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`); Contact page with address/phone.
 4. Reel editing upgrade (awaiting go-ahead): AI edit-plan playbook, 4 styles, @remotion/transitions, hook/end cards, smart edits (re-render / text-only / single scene). Check Remotion licence (free ≤3 employees).
 5. Small: text-only edits keep the image; schedule calendar should open on the month of the next post (not yet built); free trial; off-site backups; replace gpt-image-1.5.
