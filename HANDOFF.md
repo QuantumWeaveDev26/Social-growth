@@ -70,6 +70,10 @@ Customer pages: `/onboarding` (plan → business → brand kit → connect Meta 
 4. Reel editing upgrade (awaiting go-ahead): AI edit-plan playbook, 4 styles, @remotion/transitions, hook/end cards, smart edits (re-render / text-only / single scene). Check Remotion licence (free ≤3 employees).
 5. Small: text-only edits keep the image; schedule calendar should open on the month of the next post (not yet built); free trial; off-site backups; replace gpt-image-1.5.
 
+## Main website (on hold)
+
+The marketing page brandmintai.io/meta-growth (owner's other Hostinger account) still takes one-time payments and redirects to WhatsApp. It is deliberately NOT connected to the app yet. When it is, follow `docs/landing-page-integration.md`.
+
 ## Run locally
 
 ```bash
