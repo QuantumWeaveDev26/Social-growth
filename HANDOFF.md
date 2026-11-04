@@ -70,6 +70,12 @@ Customer pages: `/onboarding` (plan → business → brand kit → connect Meta 
 4. Reel editing upgrade (awaiting go-ahead): AI edit-plan playbook, 4 styles, @remotion/transitions, hook/end cards, smart edits (re-render / text-only / single scene). Check Remotion licence (free ≤3 employees).
 5. Small: text-only edits keep the image; schedule calendar should open on the month of the next post (not yet built); free trial; off-site backups; replace gpt-image-1.5.
 
+## 4 Nov additions
+- Video: Veo 3.1 Fast 1080p via Google Cloud service account (env GOOGLE_SA_JSON_B64, VEO_*), per-client switch + test clip in admin (src/lib/veo.ts). Images: Imagen 4 on the same project (IMAGE_ENGINE=openai to revert). Voice: ElevenLabs eleven_v4 (unchanged).
+- Writing: TEXT_ENGINE=gemini switches to Gemini (GEMINI_TEXT_MODEL, default gemini-2.5-flash) with automatic OpenAI fallback; currently OFF until the admin "Compare writers" test is judged.
+- Knowledge bank: Admin → Knowledge (stored in kv `kb:*`, never in git); fed into every writing step by src/lib/knowledge.ts. Source file kept privately by the owner.
+- Sign-up: industry (required), contact routes (≥1), content style, 10 languages. /app/business: products+prices, hours, links, show more/never show, up to 15 photos, completeness bar. Remake notes saved to details.feedback_notes and applied to all future content. Photos are stored and listed to the writer; using them as image/Veo reference frames is the next build.
+
 ## Main website (on hold)
 
 The marketing page brandmintai.io/meta-growth (owner's other Hostinger account) still takes one-time payments and redirects to WhatsApp. It is deliberately NOT connected to the app yet. When it is, follow `docs/landing-page-integration.md`.
