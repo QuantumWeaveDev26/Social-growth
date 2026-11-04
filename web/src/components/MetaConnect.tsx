@@ -70,12 +70,15 @@ export function MetaConnect({ conn, message, after, disconnect, check }: {
             <a href="/api/meta/connect" className="btn bg-[#1877F2] px-5 py-3 text-white hover:bg-[#1468d6]">Continue with Facebook</a>
             <span className="text-sm text-ink-2">Connects your Page and its Instagram in one go.</span>
           </div>
-          <div className="mt-5 border-t border-line pt-4 text-sm text-ink-2">
-            No Facebook Page? <a href="/api/meta/connect?via=instagram" className="font-semibold text-mint-deep underline">Connect Instagram only</a>. Posts then go to Instagram but not Facebook.
-          </div>
-          {(!live || !igLive) && (
+          {/* Instagram-only login needs its own app; hide it on a live server until that app is set up */}
+          {(igLive || !live) && (
+            <div className="mt-5 border-t border-line pt-4 text-sm text-ink-2">
+              No Facebook Page? <a href="/api/meta/connect?via=instagram" className="font-semibold text-mint-deep underline">Connect Instagram only</a>. Posts then go to Instagram but not Facebook.
+            </div>
+          )}
+          {!live && (
             <p className="hint mt-4">
-              {!live && !igLive ? "Meta app keys aren’t set on this server, so both buttons connect a demo account." : !live ? "Facebook app keys aren’t set, so “Continue with Facebook” connects a demo account." : "Instagram app keys aren’t set, so “Instagram only” connects a demo account."}
+              {!igLive ? "Meta app keys aren’t set on this server, so both buttons connect a demo account." : "Facebook app keys aren’t set, so “Continue with Facebook” connects a demo account."}
             </p>
           )}
         </div>
