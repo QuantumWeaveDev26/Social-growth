@@ -145,6 +145,11 @@ function checks(type: string, p: Record<string, unknown>) {
   if (igTags < 3 || igTags > 5) issues.push(`Instagram has ${igTags} hashtags, needs 3-5`);
   if (type === "post" && (wc(p.on_image_text) < 2 || wc(p.on_image_text) > 8)) issues.push("on_image_text must be 3-8 words");
   if (type === "reel" && (wc(p.vo_script) < 40 || wc(p.vo_script) > 85)) issues.push("vo_script must be 50-75 words");
+  if (type === "reel") {
+    const sc = (p.scenes as Array<Record<string, unknown>>) || [];
+    if (sc.length !== 4) issues.push("reel needs exactly 4 scenes");
+    if (sc.some((x) => wc(x.motion) < 12)) issues.push("every scene needs a specific motion direction (action, camera move, atmosphere, end frame)");
+  }
   const all = [p.instagram_caption, p.facebook_post, p.vo_script].join(" ");
   if (/guarantee|100%|\bdelve\b|game-?changer|unlock|elevate|seamless/i.test(all)) issues.push("remove guarantee or AI-tell wording");
   if (/https?:\/\//i.test(all)) issues.push("remove links (none were supplied)");
@@ -226,6 +231,12 @@ async function makeItem(itemId: string, step: StepFn = () => {}) {
   );
   addCost(itemId, edited.costUsd);
   const copy = { ...draft.data, ...edited.data };
+  // if the editor dropped scene fields (e.g. motion), keep the writer's version of them
+  if (Array.isArray(draft.data.scenes)) {
+    const ds = draft.data.scenes as Array<Record<string, unknown>>;
+    const es = Array.isArray(edited.data.scenes) && (edited.data.scenes as unknown[]).length === ds.length ? (edited.data.scenes as Array<Record<string, unknown>>) : ds;
+    copy.scenes = ds.map((d, i) => ({ ...d, ...es[i], motion: es[i]?.motion || d.motion, visual_prompt: es[i]?.visual_prompt || d.visual_prompt }));
+  }
   const logo = await brandLogo(item.customerId);
   const dir = `${item.customerId}/${item.planId}/${itemId}/v${item.revisionCount}`;
 
@@ -262,7 +273,7 @@ async function makeItem(itemId: string, step: StepFn = () => {}) {
     for (let i = 0; i < scenePaths.length; i++) {
       step(`Filming scene ${i + 1} of ${scenePaths.length} (Veo)`);
       try {
-        const v = await imageToVideo(absPath(scenePaths[i]), motionPrompt(String(scenes[i].visual_prompt || "")), {
+        const v = await imageToVideo(absPath(scenePaths[i]), motionPrompt(String(scenes[i].visual_prompt || ""), String(scenes[i].motion || "")), {
           onWait: (sec) => step(`Filming scene ${i + 1} of ${scenePaths.length} (Veo, ${sec}s)`),
         });
         addCost(itemId, v.costUsd);

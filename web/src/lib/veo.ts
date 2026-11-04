@@ -109,11 +109,20 @@ export async function imageToVideo(imagePath: string, prompt: string, o: { secon
   }
 }
 
-/** Motion direction for a scene, built from its still-image description. */
-export const motionPrompt = (visual: string) =>
-  `Animate this exact photograph into a realistic, smooth vertical video. Keep exactly the same people, hands, products, place, colours and lighting; do not add any new people, body parts or objects. ` +
-  `Gentle cinematic camera movement (slow push-in or subtle pan) with natural motion in the scene: ${visual}. ` +
-  `Photorealistic, steady, no cuts, no new objects, no text, letters, captions, logos or watermarks.`;
+/**
+ * Veo prompt for one scene, in Google's recommended order: action + subject, camera, style/atmosphere, then guardrails.
+ * `motion` is the scene-specific direction written by the reel writer; `visual` (the still-image description) is context.
+ */
+export const motionPrompt = (visual: string, motion = "") => {
+  const action = motion.trim() || `Natural, lively real-time movement in this scene: ${visual}. Slow push-in.`;
+  return [
+    action,
+    `Scene context: ${visual}.`,
+    "Style: photorealistic, filmed on a modern cinema camera, natural skin tones and textures, real-world physics, smooth 24fps motion, shallow depth of field.",
+    "Continuity: start exactly from the provided image and keep the same people, hands, faces, products, place, colours and lighting; do not add new people, body parts or objects; no morphing.",
+    "No text, letters, captions, signs with words, logos or watermarks. No dialogue or lip-sync.",
+  ].join(" ");
+};
 
 /** Admin test: films one clip from this client's most recent image and records the result. */
 export async function runVeoTest(customerId: string) {
