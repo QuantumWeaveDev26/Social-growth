@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { LayoutGrid, CalendarClock, Fingerprint, Settings2, LogOut, Activity, Bell, Receipt, UserRound } from "lucide-react";
+import { LayoutGrid, CalendarClock, Fingerprint, Store, Settings2, LogOut, Activity, Bell, Receipt, UserRound } from "lucide-react";
 import { unreadCount } from "@/lib/notify";
 import { daysLeft } from "@/lib/billing";
 import { ActivityPill } from "@/components/ActivityPanel";
@@ -32,6 +32,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <NavLink href="/app/activity" icon={<Activity className="size-[18px]" aria-hidden />}>Activity</NavLink>
           <NavLink href="/app/notifications" icon={<Bell className="size-[18px]" aria-hidden />} badge={unread}>Notifications</NavLink>
           <NavLink href="/app/brand" icon={<Fingerprint className="size-[18px]" aria-hidden />}>Brand profile</NavLink>
+          <NavLink href="/app/business" icon={<Store className="size-[18px]" aria-hidden />}>Business details</NavLink>
           <NavLink href="/app/settings" icon={<Settings2 className="size-[18px]" aria-hidden />}>Connections</NavLink>
           <NavLink href="/app/billing" icon={<Receipt className="size-[18px]" aria-hidden />}>Billing</NavLink>
           <NavLink href="/app/account" icon={<UserRound className="size-[18px]" aria-hidden />}>Account</NavLink>

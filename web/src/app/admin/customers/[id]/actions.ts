@@ -127,3 +127,13 @@ export async function adminVeoTest(fd: FormData) {
   enqueue("veo_test", { customerId: id }, { customerId: id });
   back(id);
 }
+
+/** Writes one post with OpenAI and with Gemini for comparison (a few cents). */
+export async function adminCompareWriters(fd: FormData) {
+  await requireAdmin();
+  const id = String(fd.get("customerId"));
+  db.insert(schema.kv).values({ key: `writer_compare:${id}`, value: JSON.stringify({ status: "queued", at: Date.now() }) })
+    .onConflictDoUpdate({ target: schema.kv.key, set: { value: JSON.stringify({ status: "queued", at: Date.now() }) } }).run();
+  enqueue("writer_compare", { customerId: id }, { customerId: id });
+  back(id);
+}

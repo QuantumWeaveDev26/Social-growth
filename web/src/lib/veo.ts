@@ -171,3 +171,27 @@ export function veoTestResult(customerId: string) {
   const v = db.select().from(schema.kv).where(eq(schema.kv.key, `veo_test:${customerId}`)).get()?.value;
   return v ? (JSON.parse(v) as { status: string; path?: string; error?: string; waited?: number; costUsd?: number; model?: string; at: number }) : null;
 }
+
+// ---------------------------------------------------------------- Gemini text (same Google Cloud project)
+export const GEMINI_TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || "gemini-2.5-flash";
+/** List prices per 1M tokens for cost tracking (override with GEMINI_PRICE_IN / GEMINI_PRICE_OUT). */
+const G_IN = Number(process.env.GEMINI_PRICE_IN || 0.3);
+const G_OUT = Number(process.env.GEMINI_PRICE_OUT || 2.5);
+
+export async function geminiJson(system: string, user: string, model = GEMINI_TEXT_MODEL) {
+  const k = sa();
+  if (!k) throw new Error("Gemini isn't configured (GOOGLE_SA_JSON_B64 missing)");
+  const loc = process.env.GEMINI_LOCATION || "global";
+  const host = loc === "global" ? "aiplatform.googleapis.com" : `${loc}-aiplatform.googleapis.com`;
+  const url = `https://${host}/v1/projects/${k.project_id}/locations/${loc}/publishers/google/models/${model}:generateContent`;
+  const r = await call<{ candidates?: Array<{ content?: { parts?: Array<{ text?: string }> }; finishReason?: string }>; usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; thoughtsTokenCount?: number } }>(url, {
+    systemInstruction: { parts: [{ text: system }] },
+    contents: [{ role: "user", parts: [{ text: user }] }],
+    generationConfig: { responseMimeType: "application/json", temperature: 0.8, maxOutputTokens: 16384 },
+  });
+  const text = r.candidates?.[0]?.content?.parts?.map((x) => x.text || "").join("") || "";
+  if (!text) throw new Error(`Gemini returned no text (${r.candidates?.[0]?.finishReason || "no candidates"})`);
+  const u = r.usageMetadata || {};
+  const costUsd = ((u.promptTokenCount || 0) * G_IN + ((u.candidatesTokenCount || 0) + (u.thoughtsTokenCount || 0)) * G_OUT) / 1e6;
+  return { text, costUsd };
+}

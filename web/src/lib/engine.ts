@@ -32,6 +32,27 @@ function sys(name: string, profileMd?: string) {
   return (profileMd ? `=== BRAND PROFILE ===\n${profileMd}\n\n` : "") + (kb ? `${kb}\n\n` : "") + `=== PLAYBOOK (output format and hard rules; wins over the knowledge bank on format) ===\n${playbook(name)}`;
 }
 
+/** Client facts every writing step must use (contact routes, products, style, past feedback). */
+export function businessFacts(c: typeof schema.customers.$inferSelect) {
+  const d = JSON.parse(c.details || "{}") as Record<string, unknown>;
+  const line = (k: string, label: string) => (d[k] ? `${label}: ${String(d[k]).trim()}` : "");
+  const notes = Array.isArray(d.feedback_notes) ? (d.feedback_notes as string[]) : [];
+  const photos = Array.isArray(d.photos) ? (d.photos as string[]).length : 0;
+  return [
+    "=== BUSINESS FACTS (the only facts you may use; anything not here is unknown) ===",
+    `Business: ${c.businessName}`,
+    line("industry", "Industry"), line("category", "Kind of business"), line("city", "Area"),
+    line("offer", "What they sell"), line("products", "Products/services with prices (owner-supplied)"), line("audience", "Who buys"),
+    line("different", "Why people pick them"), line("offers_now", "Current offers/launches"),
+    line("whatsapp", "WhatsApp"), line("phone", "Phone"), line("address", "Address"), line("hours", "Opening hours"),
+    line("order_link", "Order/booking link (say 'link in bio')"), c.websiteUrl ? `Website/Instagram: ${c.websiteUrl}` : "",
+    line("style", "Content style"), line("tone", "Tone"), line("language", "Caption and voiceover language"),
+    line("show_more", "Show more of"), line("avoid", "Never say or show"),
+    photos ? `Owner uploaded ${photos} real photos (shop/products/team).` : "",
+    notes.length ? `PAST CHANGE REQUESTS FROM THE OWNER (apply them to ALL new content):\n- ${notes.slice(-15).join("\n- ")}` : "",
+  ].filter(Boolean).join("\n");
+}
+
 function addCost(itemId: string, usd: number) {
   const it = db.select().from(schema.contentItems).where(eq(schema.contentItems.id, itemId)).get();
   if (it) db.update(schema.contentItems).set({ costUsd: it.costUsd + usd }).where(eq(schema.contentItems.id, itemId)).run();
@@ -104,7 +125,7 @@ export async function planMonth(customerId: string, month: string, step: StepFn 
     .map((r) => JSON.parse(r.brief).topic)
     .slice(-150);
 
-  const user = `MONTH: ${month}\nPOSTS: ${plan.posts}\nREELS: ${plan.reels}\nPILLARS: ${profile.pillars}\nPREVIOUS TOPICS (do not repeat):\n${prevTopics.join("\n") || "none"}`;
+  const user = `${businessFacts(c)}\n\nMONTH: ${month}\nPOSTS: ${plan.posts}\nREELS: ${plan.reels}\nPILLARS: ${profile.pillars}\nPREVIOUS TOPICS (do not repeat):\n${prevTopics.join("\n") || "none"}`;
   step("Choosing topics for the month");
   const { data } = await chatJson<{ items: Array<Record<string, string>> }>(sys("month_plan", profile.profileMd), user, { model: process.env.AI_PLAN_MODEL });
   // enforce the exact quota whatever the model returned
@@ -220,7 +241,7 @@ async function makeItem(itemId: string, step: StepFn = () => {}) {
   const colours = c.brandColors || "[]";
   const prevCopy = item.copy ? `\nPREVIOUS VERSION (the customer asked for changes):\n${item.copy}` : "";
   const fb = feedback ? `\nCUSTOMER FEEDBACK (must be applied): ${feedback}` : "";
-  const user = `BRIEF:\n${item.brief}\nBRAND COLOURS: ${colours}${prevCopy}${fb}`;
+  const user = `${businessFacts(c)}\n\nBRIEF:\n${item.brief}\nBRAND COLOURS: ${colours}${prevCopy}${fb}`;
 
   step(feedback ? "Rewriting with the customer’s note" : "Writing the caption and copy");
   const draft = await chatJson<Record<string, unknown>>(sys(item.type === "reel" ? "reel" : "post", profile.profileMd), user);
@@ -546,4 +567,28 @@ function connectionBroken(customerId: string, connId: string, reason: string) {
     body: `Meta stopped accepting our access to your accounts (${reason}). This usually happens after a password change or when a permission is removed.\n\nYour approved posts are safe and waiting. Reconnect and they go out on schedule.`,
     cta: "Reconnect now",
   });
+}
+
+/** Admin test: writes the same post twice (OpenAI vs Gemini) from one of this client's briefs, for a side-by-side look. */
+export async function compareWriters(customerId: string) {
+  const key = `writer_compare:${customerId}`;
+  const set = (v: Record<string, unknown>) => {
+    const value = JSON.stringify({ ...v, at: Date.now() });
+    db.insert(schema.kv).values({ key, value }).onConflictDoUpdate({ target: schema.kv.key, set: { value } }).run();
+  };
+  const c = db.select().from(schema.customers).where(eq(schema.customers.id, customerId)).get();
+  const profile = latestProfile(customerId);
+  const item = db.select().from(schema.contentItems).where(and(eq(schema.contentItems.customerId, customerId), eq(schema.contentItems.type, "post"))).orderBy(desc(schema.contentItems.slotAt)).get();
+  if (!c || !profile || !item) { set({ status: "failed", error: "Needs a brand profile and at least one planned post." }); return; }
+  set({ status: "running" });
+  const user = `${businessFacts(c)}\n\nBRIEF:\n${item.brief}\nBRAND COLOURS: ${c.brandColors || "[]"}`;
+  const out: Record<string, unknown> = { status: "done", brief: JSON.parse(item.brief).topic || JSON.parse(item.brief).title || "" };
+  for (const engine of ["openai", "gemini"] as const) {
+    try {
+      const t0 = Date.now();
+      const r = await chatJson<Record<string, unknown>>(sys("post", profile.profileMd), user, { engine });
+      out[engine] = { model: r.engine, seconds: Math.round((Date.now() - t0) / 1000), costUsd: r.costUsd, on_image_text: r.data.on_image_text, instagram_caption: r.data.instagram_caption, facebook_post: r.data.facebook_post };
+    } catch (e) { out[engine] = { error: String(e instanceof Error ? e.message : e).slice(0, 300) }; }
+  }
+  set(out);
 }

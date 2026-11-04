@@ -74,6 +74,12 @@ export function PlanStep({ plans, current, live, paid }: { plans: Plan[]; curren
 }
 
 type D = Record<string, string>;
+export const INDUSTRIES: [string, string][] = [
+  ["cafe", "Café / restaurant / bakery"], ["salon", "Salon / spa / beauty"], ["clinic", "Clinic / dental / health"], ["fitness", "Gym / fitness / yoga"],
+  ["fashion", "Boutique / fashion / jewellery"], ["education", "Coaching / education"], ["real_estate", "Real estate"], ["home_services", "Home services / repairs"],
+  ["d2c", "Online product brand (D2C)"], ["other", "Other"],
+];
+export const STYLES: [string, string][] = [["lively", "Lively and fun"], ["warm", "Warm and friendly"], ["premium", "Calm and premium"], ["bold", "Bold and energetic"]];
 export function BusinessStep({ name, website, d }: { name: string; website: string; d: D }) {
   const [state, action] = useActionState(saveBusiness, undefined);
   const T = ({ id, label, hint, rows = 3, ph, required }: { id: string; label: string; hint?: string; rows?: number; ph?: string; required?: boolean }) => (
@@ -93,14 +99,36 @@ export function BusinessStep({ name, website, d }: { name: string; website: stri
       <div className="grid grid-cols-2 gap-5">
         <div><label className="label" htmlFor="businessName">Business name</label><input id="businessName" name="businessName" defaultValue={name} className="field" /></div>
         <div><label className="label" htmlFor="website">Website or Instagram link</label><input id="website" name="website" defaultValue={website} placeholder="yourbusiness.in" className="field" /><p className="hint">Optional. We read it to learn your products and wording.</p></div>
-        <div><label className="label" htmlFor="category">What kind of business</label><input id="category" name="category" defaultValue={d.category} placeholder="Home bakery, dental clinic, boutique…" className="field" /></div>
+        <div>
+          <label className="label" htmlFor="industry">Industry<span className="text-mint-deep"> *</span></label>
+          <select id="industry" name="industry" defaultValue={d.industry || ""} required className="field">
+            <option value="" disabled>Choose one</option>
+            {INDUSTRIES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
+        </div>
+        <div><label className="label" htmlFor="category">What kind of business, in your words</label><input id="category" name="category" defaultValue={d.category} placeholder="Home bakery, dental clinic, boutique…" className="field" /></div>
         <div><label className="label" htmlFor="city">City or area you serve</label><input id="city" name="city" defaultValue={d.city} placeholder="Koramangala, Bengaluru" className="field" /></div>
       </div>
       <T id="offer" label="What do you sell?" required ph="Eggless cakes and cardamom buns, made to order. Delivery within 5 km." />
       <T id="audience" label="Who buys from you?" required ph="Working parents ordering for birthdays; offices ordering on Fridays." />
       <T id="different" label="Why do people pick you over others?" ph="Everything baked the same morning. No preservatives. Owner answers every DM." />
       <T id="offers_now" label="Offers or launches coming up" rows={2} ph="Diwali hampers from 1 Nov. 10% off first order." hint="Optional. We’ll keep offers to about one in five posts." />
-      <div className="grid grid-cols-2 gap-5">
+      <div className="rounded-[14px] bg-sheet p-5 ring-1 ring-line">
+        <p className="font-semibold">How do customers reach you?</p>
+        <p className="hint mt-1">We only ever use the routes you give here in posts, like “WhatsApp us” or “Visit us at…”. Fill at least one.</p>
+        <div className="mt-3 grid grid-cols-3 gap-4">
+          <div><label className="label" htmlFor="whatsapp">WhatsApp number</label><input id="whatsapp" name="whatsapp" defaultValue={d.whatsapp} placeholder="+91 98xxx xxxxx" className="field" /></div>
+          <div><label className="label" htmlFor="phone">Phone for calls</label><input id="phone" name="phone" defaultValue={d.phone} placeholder="Optional" className="field" /></div>
+          <div><label className="label" htmlFor="address">Shop address or area</label><input id="address" name="address" defaultValue={d.address} placeholder="12th Main, Indiranagar" className="field" /></div>
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-5">
+        <div>
+          <label className="label" htmlFor="style">Content style</label>
+          <select id="style" name="style" defaultValue={d.style || "lively"} className="field">
+            {STYLES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
+        </div>
         <div>
           <label className="label" htmlFor="tone">How should you sound?</label>
           <select id="tone" name="tone" defaultValue={d.tone || "warm"} className="field">
@@ -116,6 +144,13 @@ export function BusinessStep({ name, website, d }: { name: string; website: stri
             <option value="english">English</option>
             <option value="hinglish">English with some Hindi (Hinglish)</option>
             <option value="hindi">Hindi</option>
+            <option value="kannada">Kannada</option>
+            <option value="tamil">Tamil</option>
+            <option value="telugu">Telugu</option>
+            <option value="malayalam">Malayalam</option>
+            <option value="marathi">Marathi</option>
+            <option value="bengali">Bengali</option>
+            <option value="gujarati">Gujarati</option>
           </select>
         </div>
       </div>

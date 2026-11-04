@@ -73,11 +73,16 @@ export async function confirmSubscription(paymentId: string, subscriptionId: str
 export async function saveBusiness(_: StepState, fd: FormData): Promise<StepState> {
   const { customer } = await requireCustomer({ allowOnboarding: true });
   const get = (k: string) => String(fd.get(k) || "").trim();
+  const prev = JSON.parse(customer.details || "{}");
   const details = {
-    category: get("category"), city: get("city"), offer: get("offer"), audience: get("audience"),
+    ...prev, // keep later additions (products, photos, remembered feedback)
+    industry: get("industry"), category: get("category"), city: get("city"), offer: get("offer"), audience: get("audience"),
     different: get("different"), offers_now: get("offers_now"), tone: get("tone"), language: get("language"), avoid: get("avoid"),
+    whatsapp: get("whatsapp"), phone: get("phone"), address: get("address"), style: get("style"),
   };
   if (!details.offer || !details.audience) return { error: "Tell us what you sell and who buys it. Those two answers shape everything." };
+  if (!details.industry) return { error: "Choose your industry so we follow the right rules for your business." };
+  if (!details.whatsapp && !details.phone && !details.address && !get("website")) return { error: "Add at least one way customers can reach you: WhatsApp, phone, address or website." };
   db.update(schema.customers)
     .set({ businessName: get("businessName") || customer.businessName, websiteUrl: get("website") || null, details: JSON.stringify(details), onboardStep: Math.max(customer.onboardStep, 3) })
     .where(eq(schema.customers.id, customer.id))

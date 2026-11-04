@@ -10,7 +10,7 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { daysLeft } from "@/lib/billing";
 import { currentMonth, nextMonth, fmtDateTime, inr, monthLabel } from "@/lib/format";
 import { mediaUrl } from "@/lib/storage";
-import { adminChangePlan, adminExtend, adminSetStatus, adminRetryFailed, adminReleaseHeld, adminPlanMonth, adminRebuildProfile, adminAttachOwner, adminAllowGeneration, adminSetVeo, adminVeoTest } from "./actions";
+import { adminChangePlan, adminExtend, adminSetStatus, adminRetryFailed, adminReleaseHeld, adminPlanMonth, adminRebuildProfile, adminAttachOwner, adminAllowGeneration, adminSetVeo, adminVeoTest, adminCompareWriters } from "./actions";
 import { veoConfigured, veoFor, veoTestResult } from "@/lib/veo";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { generationPaused, generationAllowList } from "@/lib/jobs";
@@ -129,6 +129,31 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
             })()}
           </section>
         </div>
+
+        {(() => {
+          const raw = db.select().from(schema.kv).where(eq(schema.kv.key, `writer_compare:${id}`)).get()?.value;
+          const w = raw ? JSON.parse(raw) : null;
+          const busy = w && ["queued", "running"].includes(w.status);
+          const Col = ({ name, r }: { name: string; r?: Record<string, unknown> }) => (
+            <div className="rounded-[12px] bg-white p-4 ring-1 ring-line">
+              <p className="text-sm font-semibold">{name} {r?.model ? <span className="font-normal text-ink-3">· {String(r.model)} · {String(r.seconds)}s · ${Number(r.costUsd || 0).toFixed(3)}</span> : null}</p>
+              {r?.error ? <p className="mt-2 text-sm text-red">{String(r.error)}</p> : r ? (
+                <div className="mt-2 space-y-2 whitespace-pre-wrap text-sm"><p className="font-bold">{String(r.on_image_text || "")}</p><p>{String(r.instagram_caption || "")}</p><p className="text-ink-2">{String(r.facebook_post || "")}</p></div>
+              ) : null}
+            </div>
+          );
+          return (
+            <section className="mt-8 rounded-[14px] bg-sheet p-5 ring-1 ring-line">
+              <div className="flex items-center justify-between gap-4">
+                <div><h2 className="font-bold">Writer comparison</h2><p className="text-sm text-ink-2">Same brief, OpenAI vs Gemini. {w?.brief ? `Brief: ${w.brief}` : ""}</p></div>
+                <form action={adminCompareWriters}><Hidden /><SubmitButton className="btn btn-ghost" pending="Queued" disabled={!!busy}>{busy ? "Writing…" : "Compare writers (~$0.05)"}</SubmitButton></form>
+              </div>
+              <AutoRefresh active={!!busy} />
+              {w?.status === "failed" && <p className="mt-3 text-sm text-red">{w.error}</p>}
+              {w?.status === "done" && <div className="mt-4 grid grid-cols-2 gap-4"><Col name="OpenAI" r={w.openai} /><Col name="Gemini" r={w.gemini} /></div>}
+            </section>
+          );
+        })()}
 
         <h2 className="mt-10 text-lg font-bold">Months</h2>
         <table className="tnum mt-3 w-full overflow-hidden rounded-[12px] bg-sheet text-left text-[0.88rem] ring-1 ring-line">

@@ -25,7 +25,32 @@ async function gateway<T>(body: Record<string, unknown>, timeoutMs = 300_000): P
 export type ChatUsage = { prompt_tokens?: number; completion_tokens?: number };
 
 /** Chat completion that must return a JSON object. */
-export async function chatJson<T = Record<string, unknown>>(system: string, user: string, opts: { model?: string } = {}): Promise<{ data: T; costUsd: number }> {
+const parseJson = <T,>(raw: string): T => {
+  const cleaned = raw.replace(/\s*—\s*/g, ", ");
+  try { return JSON.parse(cleaned); } catch {
+    const m = cleaned.match(/\{[\s\S]*\}/);
+    if (!m) throw new Error("Model did not return JSON");
+    return JSON.parse(m[0]);
+  }
+};
+
+/** Chat that must return a JSON object. Gemini (Google credit) when TEXT_ENGINE=gemini, with OpenAI as automatic fallback. */
+export async function chatJson<T = Record<string, unknown>>(system: string, user: string, opts: { model?: string; engine?: "gemini" | "openai" } = {}): Promise<{ data: T; costUsd: number; engine: string }> {
+  const engine = opts.engine || (process.env.TEXT_ENGINE === "gemini" ? "gemini" : "openai");
+  if (engine === "gemini") {
+    try {
+      const { geminiJson, GEMINI_TEXT_MODEL } = await import("./veo");
+      const g = await geminiJson(system, user);
+      return { data: parseJson<T>(g.text), costUsd: g.costUsd, engine: GEMINI_TEXT_MODEL };
+    } catch (e) {
+      if (opts.engine === "gemini") throw e;
+      console.error("gemini failed, falling back to openai:", e instanceof Error ? e.message : e);
+    }
+  }
+  return { ...(await openaiJson<T>(system, user, opts)), engine: opts.model || process.env.AI_TEXT_MODEL || "gpt-5-mini" };
+}
+
+async function openaiJson<T>(system: string, user: string, opts: { model?: string } = {}): Promise<{ data: T; costUsd: number }> {
   const model = opts.model || process.env.AI_TEXT_MODEL || "gpt-5-mini";
   const request: Record<string, unknown> = {
     model,
@@ -39,15 +64,7 @@ export async function chatJson<T = Record<string, unknown>>(system: string, user
   else request.temperature = 0.7;
   const r = await gateway<{ content: string | null; usage: ChatUsage | null; error: unknown }>({ type: "chat", request });
   if (!r.content) throw new Error("Model returned no content: " + JSON.stringify(r.error).slice(0, 300));
-  const cleaned = r.content.replace(/\s*—\s*/g, ", ");
-  let data: T;
-  try {
-    data = JSON.parse(cleaned);
-  } catch {
-    const m = cleaned.match(/\{[\s\S]*\}/);
-    if (!m) throw new Error("Model did not return JSON");
-    data = JSON.parse(m[0]);
-  }
+  const data = parseJson<T>(r.content);
   const u = r.usage || {};
   // approximate list prices per 1M tokens (gpt-5-mini: $0.25 in / $2 out; gpt-5: $1.25 / $10)
   const [pin, pout] = model.startsWith("gpt-5-mini") ? [0.25, 2] : [1.25, 10];

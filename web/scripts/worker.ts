@@ -5,7 +5,7 @@
 import os from "node:os";
 import crypto from "node:crypto";
 import { claimNext, finishJob, stepper, generationPaused, setGenerationPaused } from "../src/lib/jobs";
-import { buildBrandProfile, planMonth, generateItem, publishDue, syncConnections, syncFacebookSchedule } from "../src/lib/engine";
+import { compareWriters, buildBrandProfile, planMonth, generateItem, publishDue, syncConnections, syncFacebookSchedule } from "../src/lib/engine";
 import { db, schema } from "../src/db";
 import { deliverNotification } from "../src/lib/notify";
 import { runDaily } from "../src/lib/cycle";
@@ -25,6 +25,7 @@ async function handle(job: NonNullable<ReturnType<typeof claimNext>>) {
     else if (job.type === "publish_due") await publishDue();
     else if (job.type === "send_email") await deliverNotification(p.notificationId, p.cta);
     else if (job.type === "veo_test") await runVeoTest(p.customerId);
+    else if (job.type === "writer_compare") await compareWriters(p.customerId);
     finishJob(job.id);
     console.log(new Date().toISOString(), "done", job.type, job.id);
   } catch (e) {

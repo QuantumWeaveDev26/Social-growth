@@ -32,6 +32,7 @@ export function startRemake(itemId: string, customerId: string, comment: string,
   const item = db.select().from(schema.contentItems).where(eq(schema.contentItems.id, itemId)).get();
   if (!item) return;
   db.insert(schema.approvals).values({ itemId, decision: "changes", comment, charge, createdAt: new Date() }).run();
+  if (charge !== "retry") rememberFeedback(customerId, comment);
   db.update(schema.contentItems)
     .set({ status: "changes_requested", revisionCount: charge === "retry" ? item.revisionCount : item.revisionCount + 1, error: null, updatedAt: new Date() })
     .where(eq(schema.contentItems.id, itemId)).run();
@@ -47,4 +48,15 @@ export function fulfilPaidRemake(orderId: string, paymentId: string) {
   db.update(schema.payments).set({ status: "paid", paymentId }).where(eq(schema.payments.id, p.id)).run();
   startRemake(p.itemId, p.customerId, p.note || "Remake", "paid");
   return { ok: true as const, itemId: p.itemId };
+}
+
+/** Keeps the owner's change requests so every future post and month follows them (last 15). */
+export function rememberFeedback(customerId: string, note: string) {
+  const c = db.select().from(schema.customers).where(eq(schema.customers.id, customerId)).get();
+  if (!c || note.trim().length < 4) return;
+  const d = JSON.parse(c.details || "{}");
+  const notes: string[] = Array.isArray(d.feedback_notes) ? d.feedback_notes : [];
+  if (!notes.includes(note.trim())) notes.push(note.trim().slice(0, 300));
+  d.feedback_notes = notes.slice(-15);
+  db.update(schema.customers).set({ details: JSON.stringify(d) }).where(eq(schema.customers.id, customerId)).run();
 }
