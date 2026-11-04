@@ -11,4 +11,4 @@ web/.claude/
 web/tsconfig.tsbuildinfo
 video/public/job/
 *.log
-knowledge/
+/knowledge/
