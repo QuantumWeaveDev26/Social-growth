@@ -10,7 +10,8 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { daysLeft } from "@/lib/billing";
 import { currentMonth, nextMonth, fmtDateTime, inr, monthLabel } from "@/lib/format";
 import { mediaUrl } from "@/lib/storage";
-import { adminChangePlan, adminExtend, adminSetStatus, adminRetryFailed, adminReleaseHeld, adminPlanMonth, adminRebuildProfile, adminAttachOwner } from "./actions";
+import { adminChangePlan, adminExtend, adminSetStatus, adminRetryFailed, adminReleaseHeld, adminPlanMonth, adminRebuildProfile, adminAttachOwner, adminAllowGeneration } from "./actions";
+import { generationPaused, generationAllowList } from "@/lib/jobs";
 
 export const metadata = { title: "Customer" };
 export const dynamic = "force-dynamic";
@@ -48,9 +49,15 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
             <h1 className="font-display text-[2.2rem] leading-none tracking-[-0.03em]" style={{ fontWeight: 800 }}>{c.businessName}</h1>
             <p className="tnum mt-2 text-ink-2">{owner?.name} · {owner?.email} · joined {fmtDateTime(c.createdAt)} · <span className="capitalize">{c.status}</span> · AI spend {usd(totalCost)}</p>
           </div>
+          <div className="flex flex-wrap items-center gap-3">
+          {generationPaused() && (() => { const on = generationAllowList().has(id); return (
+            <form action={adminAllowGeneration}><Hidden /><input type="hidden" name="on" value={on ? "0" : "1"} />
+              <SubmitButton className={`btn ${on ? "btn-ghost" : ""}`} pending="Saving">{on ? "Stop AI for this client (back to paused)" : "Allow AI for this client while paused"}</SubmitButton>
+            </form>); })()}
           <form action={adminSetStatus}><Hidden /><input type="hidden" name="status" value={c.status === "paused" ? "active" : "paused"} />
             <SubmitButton className="btn btn-ghost" pending="Saving">{c.status === "paused" ? "Resume customer (generation runs again)" : "Pause customer (holds AI generation)"}</SubmitButton>
           </form>
+          </div>
         </div>
 
         {!owner && (

@@ -1,4 +1,5 @@
 "use server";
+import { setGenerationAllowed } from "@/lib/jobs";
 import { revalidatePath } from "next/cache";
 import { and, eq, gt, inArray } from "drizzle-orm";
 import { db, schema } from "@/db";
@@ -97,5 +98,13 @@ export async function adminAttachOwner(fd: FormData) {
     title: "Set a password for BrandMint AI",
     body: "Your BrandMint AI account is ready for you. Choose a password to sign in. Everything you set up earlier is still there.\n\nThis link works for 3 days and only once.",
   }, userId);
+  back(id);
+}
+
+/** Lets this client's AI jobs run even while generation is paused for everyone (e.g. the Meta reviewer account). */
+export async function adminAllowGeneration(fd: FormData) {
+  await requireAdmin();
+  const id = String(fd.get("customerId"));
+  setGenerationAllowed(id, fd.get("on") === "1");
   back(id);
 }

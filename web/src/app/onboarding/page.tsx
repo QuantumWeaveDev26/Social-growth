@@ -8,6 +8,7 @@ import { signOut } from "../(auth)/actions";
 import { razorpayLive } from "@/lib/razorpay";
 import { MetaConnect } from "@/components/MetaConnect";
 import { mediaUrl } from "@/lib/storage";
+import { generationHeldFor } from "@/lib/jobs";
 import { PlanStep, BusinessStep, BrandKitStep, ProfileStep } from "./Steps";
 import { afterMeta } from "./actions";
 
@@ -32,6 +33,7 @@ export default async function Onboarding({ searchParams }: { searchParams: Promi
   const pendingProfile = db.select().from(schema.jobs).where(eq(schema.jobs.customerId, customer.id)).orderBy(desc(schema.jobs.createdAt)).all().find((j) => j.type === "brand_profile");
   const profileBusy = pendingProfile ? ["queued", "running"].includes(pendingProfile.status) : !profile;
   const details = JSON.parse(customer.details || "{}");
+  const onHold = profileBusy && generationHeldFor(customer.id);
 
   return (
     <div className="grid min-h-dvh grid-cols-[300px_1fr]">
@@ -78,7 +80,7 @@ export default async function Onboarding({ searchParams }: { searchParams: Promi
               <form action={afterMeta} className="mt-5"><button className="text-sm text-ink-2 underline hover:text-ink">Do this later. Content will wait for approval anyway.</button></form>
             </section>
           )}
-          {step === 5 && <ProfileStep busy={profileBusy} failed={pendingProfile?.status === "failed" ? pendingProfile.error : null} summary={profile?.summary} profileMd={profile?.profileMd} pillars={profile ? JSON.parse(profile.pillars) : []} />}
+          {step === 5 && <ProfileStep busy={profileBusy} onHold={onHold} failed={pendingProfile?.status === "failed" ? pendingProfile.error : null} summary={profile?.summary} profileMd={profile?.profileMd} pillars={profile ? JSON.parse(profile.pillars) : []} />}
         </div>
       </main>
     </div>

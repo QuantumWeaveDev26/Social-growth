@@ -22,9 +22,28 @@ export function setGenerationPaused(on: boolean) {
     .onConflictDoUpdate({ target: schema.kv.key, set: { value: on ? "1" : "0" } }).run();
 }
 
+/** Customers whose AI jobs still run while generation is paused globally (e.g. the Meta reviewer account). */
+export function generationAllowList() {
+  const v = db.select().from(schema.kv).where(eq(schema.kv.key, "generation_allow")).get()?.value || "";
+  return new Set(v.split(",").filter(Boolean));
+}
+export function setGenerationAllowed(customerId: string, on: boolean) {
+  const set = generationAllowList();
+  if (on) set.add(customerId); else set.delete(customerId);
+  const value = [...set].join(",");
+  db.insert(schema.kv).values({ key: "generation_allow", value }).onConflictDoUpdate({ target: schema.kv.key, set: { value } }).run();
+}
+/** True when this customer's AI jobs are held right now. */
+export function generationHeldFor(customerId: string) {
+  const c = db.select({ status: schema.customers.status }).from(schema.customers).where(eq(schema.customers.id, customerId)).get();
+  if (c?.status === "paused") return true;
+  return generationPaused() && !generationAllowList().has(customerId);
+}
+
 /** Claim the next due job (SQLite: single writer, so select + conditional update is safe). */
 export function claimNext() {
   const globalPause = generationPaused();
+  const allow = generationAllowList();
   const paused = new Set(db.select({ id: schema.customers.id }).from(schema.customers).where(eq(schema.customers.status, "paused")).all().map((c) => c.id));
   const candidates = db
     .select()
@@ -33,7 +52,7 @@ export function claimNext() {
     .orderBy(asc(schema.jobs.runAt))
     .limit(50)
     .all();
-  const next = candidates.find((j) => !SPENDING.includes(j.type) || (!globalPause && !(j.customerId && paused.has(j.customerId))));
+  const next = candidates.find((j) => !SPENDING.includes(j.type) || ((!globalPause || (j.customerId != null && allow.has(j.customerId))) && !(j.customerId && paused.has(j.customerId))));
   if (!next) return null;
   const res = db
     .update(schema.jobs)

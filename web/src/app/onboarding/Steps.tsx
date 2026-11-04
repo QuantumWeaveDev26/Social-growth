@@ -178,7 +178,7 @@ export function BrandKitStep({ logo, colours, times }: { logo: string | null; co
   );
 }
 
-export function ProfileStep({ busy, failed, summary, profileMd, pillars }: { busy: boolean; failed: string | null; summary?: string; profileMd?: string; pillars: Array<{ name: string; why: string; share?: number }> }) {
+export function ProfileStep({ busy, onHold, failed, summary, profileMd, pillars }: { busy: boolean; onHold?: boolean; failed: string | null; summary?: string; profileMd?: string; pillars: Array<{ name: string; why: string; share?: number }> }) {
   const [state, action] = useActionState(confirmProfile, undefined);
   const [fix, setFix] = useState("");
   const router = useRouter();
@@ -188,6 +188,17 @@ export function ProfileStep({ busy, failed, summary, profileMd, pillars }: { bus
     return () => clearInterval(t);
   }, [busy, router]);
 
+  if (busy && onHold) {
+    return (
+      <section>
+        <H>You’re in the queue</H>
+        <p className="mt-3 max-w-[60ch] text-ink-2">We’ve saved your answers. Your brand profile will be written shortly. You can close this page and come back; it will be waiting here for you to check.</p>
+        <div className="mt-8 rounded-[14px] bg-sheet p-6 ring-1 ring-line">
+          <p className="flex items-center gap-2 text-sm font-medium text-ink-2"><Loader2 className="size-4 animate-spin" aria-hidden />Waiting for a free slot</p>
+        </div>
+      </section>
+    );
+  }
   if (busy) {
     return (
       <section>
