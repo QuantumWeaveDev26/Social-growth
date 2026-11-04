@@ -17,6 +17,7 @@ import { seal, open as openSecret } from "./crypto";
 import { notify } from "./notify";
 import { monthLabel } from "./format";
 import { veoFor, imageToVideo, motionPrompt } from "./veo";
+import { knowledgeFor } from "./knowledge";
 
 const run = promisify(execFile);
 const PB_DIR = path.join(process.cwd(), "src/playbooks/saas");
@@ -27,7 +28,8 @@ function latestProfile(customerId: string) {
 }
 
 function sys(name: string, profileMd?: string) {
-  return (profileMd ? `=== BRAND PROFILE ===\n${profileMd}\n\n` : "") + `=== PLAYBOOK ===\n${playbook(name)}`;
+  const kb = knowledgeFor(name);
+  return (profileMd ? `=== BRAND PROFILE ===\n${profileMd}\n\n` : "") + (kb ? `${kb}\n\n` : "") + `=== PLAYBOOK (output format and hard rules; wins over the knowledge bank on format) ===\n${playbook(name)}`;
 }
 
 function addCost(itemId: string, usd: number) {

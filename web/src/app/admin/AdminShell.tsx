@@ -7,6 +7,7 @@ const TABS = [
   { id: "clients", href: "/admin/customers", label: "Clients" },
   { id: "activity", href: "/admin/activity", label: "Live activity" },
   { id: "jobs", href: "/admin/jobs", label: "Failed jobs" },
+  { id: "knowledge", href: "/admin/knowledge", label: "Knowledge" },
 ] as const;
 
 export function AdminShell({ active, email, badges = {}, children }: { active: (typeof TABS)[number]["id"] | null; email?: string; badges?: Partial<Record<(typeof TABS)[number]["id"], number>>; children: React.ReactNode }) {
