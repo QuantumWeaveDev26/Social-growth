@@ -13,9 +13,9 @@ export default function Terms() {
         <li>You must have the right to manage the Facebook Page and Instagram account you connect.</li>
       </ul>
       <h2>Approvals and changes</h2>
-      <p>Each item includes the number of change rounds shown for your plan. Approving an item means you are happy for it to be published as shown. You are responsible for checking facts, prices and offers in your content before you approve it.</p>
+      <p>Each plan includes 3 free remakes a month, shared across all your posts and reels. After those, an extra remake costs ₹199 for a post or ₹399 for a reel, paid before it is made. Remaking a post that failed to generate is always free. Approving an item means you are happy for it to be published as shown. You are responsible for checking facts, prices and offers in your content before you approve it.</p>
       <h2>Plans and payment</h2>
-      <p>Plans are billed monthly in Indian rupees, including GST. Your first month is paid through Razorpay. After that we send a payment link each month; there is no automatic debit and no long-term contract. Advertising spend, where your plan includes ad setup, is paid by you directly to Meta.</p>
+      <p>Plans are billed monthly in Indian rupees, including GST. Payment is by monthly auto-pay through Razorpay (UPI Autopay or card): you approve the mandate once and are charged the plan price each month on the same date. There is no long-term contract. Advertising spend, where your plan includes ad setup, is paid by you directly to Meta.</p>
       <h2>What we do not promise</h2>
       <p>We do not guarantee followers, reach, leads or sales. Social platforms can change their rules or limit accounts at any time; we are not responsible for their decisions.</p>
       <h2>Acceptable use</h2>
@@ -23,7 +23,7 @@ export default function Terms() {
       <h2>Ownership</h2>
       <p>Once paid for, the posts and videos we make for you are yours to use. We may keep copies to run the service and will not show them publicly without your permission.</p>
       <h2>Ending the service</h2>
-      <p>You can stop at the end of any paid month by not renewing. We may end the service with notice if these terms are broken. See our <a className="font-semibold text-mint-deep underline" href="/refunds">cancellation and refund policy</a>.</p>
+      <p>You can turn off auto-pay at any time from the Billing page; your plan then ends at the end of the month already paid. We may end the service with notice if these terms are broken. See our <a className="font-semibold text-mint-deep underline" href="/refunds">cancellation and refund policy</a>.</p>
       <h2>Liability</h2>
       <p>To the extent the law allows, our total liability for any claim is limited to the amount you paid us for the month in which the claim arose.</p>
       <h2>Law</h2>

@@ -55,11 +55,21 @@ export function billing() {
       }
       continue;
     }
+    const autopay = !!s.rzpSubscriptionId && ["authenticated", "active", "pending"].includes(s.rzpStatus || "");
+    if (autopay) {
+      // Razorpay charges and renews by itself (webhook). Only lapse if a charge is 3+ days overdue.
+      if (s.status === "active" && left <= -3) {
+        db.update(schema.subscriptions).set({ status: "past_due" }).where(eq(schema.subscriptions.id, s.id)).run();
+        notify(s.customerId, { kind: "past_due", email: true, dedupeKey: `past_due:${s.id}:${s.periodEnd.getTime()}`, link: "/app/billing", cta: "Check billing", title: "Your plan is on hold", body: "We haven’t received this month’s auto-pay, so new content is paused. Posts you already approved still go out.\n\nCheck your UPI Autopay mandate or card in Billing." });
+        lapsed++;
+      }
+      continue;
+    }
     if (s.status === "active" && left > 0 && left <= 5) {
       const r = notify(s.customerId, {
-        kind: "renewal_due", email: true, dedupeKey: `renewal_due:${s.id}:${s.periodEnd.getTime()}`, link: "/app/billing", cta: "Renew my plan",
+        kind: "renewal_due", email: true, dedupeKey: `renewal_due:${s.id}:${s.periodEnd.getTime()}`, link: "/app/billing", cta: "Set up auto-pay",
         title: `Your plan ends in ${left} day${left === 1 ? "" : "s"}`,
-        body: `Your BrandMint AI plan runs until ${fmtDateTime(s.periodEnd).split(",").slice(0, 2).join(",")}.\n\nRenew now so next month’s posts are planned and approved posts keep going out without a gap.`,
+        body: `Your BrandMint AI plan runs until ${fmtDateTime(s.periodEnd).split(",").slice(0, 2).join(",")}.\n\nAuto-pay is off, so set it up again in Billing to keep next month’s posts coming without a gap.`,
       });
       if (r) reminded++;
     }

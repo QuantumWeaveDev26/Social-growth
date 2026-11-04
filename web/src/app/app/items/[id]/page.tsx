@@ -11,6 +11,8 @@ import { AutoRefresh } from "@/components/AutoRefresh";
 import { SubmitButton } from "@/components/SubmitButton";
 import { approveItem, unscheduleItem, postNow } from "../../actions";
 import { ChangesForm, PreviewTabs } from "./Client";
+import { remakeAllowance, remakePrice } from "@/lib/remakes";
+import { razorpayLive } from "@/lib/razorpay";
 
 export const metadata = { title: "Review" };
 
@@ -29,7 +31,9 @@ export default async function ItemPage({ params, searchParams }: { params: Promi
   const conn = db.select().from(schema.metaConnections).where(eq(schema.metaConnections.customerId, customer.id)).get();
   const sub = db.select().from(schema.subscriptions).where(eq(schema.subscriptions.customerId, customer.id)).get();
   const plan = sub && db.select().from(schema.plans).where(eq(schema.plans.id, sub.planId)).get();
-  const revLeft = Math.max(0, (plan?.revisions ?? 2) - item.revisionCount);
+  const allowance = remakeAllowance(customer.id);
+  const resetsOn = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" }).format(allowance.resetsOn);
+  const remakeProps = { freeLeft: allowance.left, freeTotal: allowance.free, resetsOn, price: remakePrice(item.type), kind: (item.type === "reel" ? "reel" : "post") as "post" | "reel", live: razorpayLive() };
   const brief = JSON.parse(item.brief);
   const copy = item.copy ? JSON.parse(item.copy) : null;
   const making = ["planned", "generating", "changes_requested"].includes(item.status);
@@ -116,7 +120,7 @@ export default async function ItemPage({ params, searchParams }: { params: Promi
                 <p className="text-sm text-ink-2">{nextToReview ? "Then we take you to the next one." : "This is the last one waiting."}</p>
               </form>
               <div className="mt-6 border-t border-line pt-5">
-                <ChangesForm itemId={id} revLeft={revLeft} />
+                <ChangesForm itemId={id} {...remakeProps} />
               </div>
             </div>
           )}
@@ -125,7 +129,7 @@ export default async function ItemPage({ params, searchParams }: { params: Promi
             <div className="mt-8 rounded-[14px] bg-red-wash p-6">
               <p className="font-semibold text-red">This one didn’t come out right</p>
               <p className="mt-1 text-sm text-ink-2">{item.error || "Something failed while making it."} Tell us what you want and we’ll try again. This doesn’t use a revision.</p>
-              <div className="mt-5"><ChangesForm itemId={id} revLeft={1} free /></div>
+              <div className="mt-5"><ChangesForm itemId={id} {...remakeProps} free /></div>
             </div>
           )}
 

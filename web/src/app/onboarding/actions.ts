@@ -7,17 +7,17 @@ import { db, schema } from "@/db";
 import { requireCustomer } from "@/lib/auth";
 import { enqueue } from "@/lib/jobs";
 import { saveFile } from "@/lib/storage";
-import { createOrder, razorpayLive, verifySignature } from "@/lib/razorpay";
+import { createSubscription, fetchSubscription, razorpayLive, verifySubscriptionSignature } from "@/lib/razorpay";
 import { currentMonth, nextMonth } from "@/lib/format";
-import { applyPayment } from "@/lib/billing";
+import { applyPayment, applySubscriptionCharge } from "@/lib/billing";
 
-export type StepState = { error?: string; order?: { id: string; amount: number; key: string; name: string; email: string } } | undefined;
+export type StepState = { error?: string; checkout?: { subscriptionId: string; key: string; name: string; email: string; plan: string } } | undefined;
 
 const setStep = (customerId: string, step: number) =>
   db.update(schema.customers).set({ onboardStep: step }).where(eq(schema.customers.id, customerId)).run();
 
-function activateSubscription(customerId: string, planId: string, provider: "razorpay" | "demo", orderId?: string, paymentId?: string) {
-  applyPayment(customerId, planId, provider, { orderId, paymentId });
+function activateSubscription(customerId: string, planId: string, provider: "demo") {
+  applyPayment(customerId, planId, provider);
 }
 
 /** Step 1: plan + payment */
@@ -39,22 +39,32 @@ export async function choosePlan(_: StepState, fd: FormData): Promise<StepState>
     redirect("/onboarding");
   }
   try {
-    const order = await createOrder(plan.priceInr, customer.id.slice(0, 30));
+    const rs = await createSubscription(plan, customer.id);
     db.insert(schema.subscriptions)
-      .values({ customerId: customer.id, planId: plan.id, status: "pending", provider: "razorpay", orderId: order.id })
-      .onConflictDoUpdate({ target: schema.subscriptions.customerId, set: { planId: plan.id, status: "pending", provider: "razorpay", orderId: order.id } })
+      .values({ customerId: customer.id, planId: plan.id, status: "pending", provider: "razorpay", rzpSubscriptionId: rs.id, rzpStatus: rs.status })
+      .onConflictDoUpdate({ target: schema.subscriptions.customerId, set: { planId: plan.id, status: "pending", provider: "razorpay", rzpSubscriptionId: rs.id, rzpStatus: rs.status } })
       .run();
-    return { order: { id: order.id, amount: order.amount, key: process.env.RAZORPAY_KEY_ID!, name: user.name, email: user.email } };
+    return { checkout: { subscriptionId: rs.id, key: process.env.RAZORPAY_KEY_ID!, name: user.name, email: user.email, plan: `${plan.name} · monthly auto-pay` } };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Payment could not start. Try again." };
   }
 }
 
-export async function confirmPayment(orderId: string, paymentId: string, signature: string) {
+/** Checkout success for the first auto-pay charge. The webhook reports the same payment; whichever arrives first records it. */
+export async function confirmSubscription(paymentId: string, subscriptionId: string, signature: string) {
   const { customer } = await requireCustomer({ allowOnboarding: true });
   const sub = db.select().from(schema.subscriptions).where(eq(schema.subscriptions.customerId, customer.id)).get();
-  if (!sub || sub.orderId !== orderId || !verifySignature(orderId, paymentId, signature)) return { error: "We couldn’t verify that payment. If you were charged, write to us and we’ll fix it within a day." };
-  activateSubscription(customer.id, sub.planId, "razorpay", orderId, paymentId);
+  if (!sub || sub.rzpSubscriptionId !== subscriptionId || !verifySubscriptionSignature(paymentId, subscriptionId, signature))
+    return { error: "We couldn’t verify that payment. If you were charged, write to support@brandmintai.io and we’ll fix it within a day." };
+  const plan = db.select().from(schema.plans).where(eq(schema.plans.id, sub.planId)).get();
+  let start: Date | null = null, end: Date | null = null, status = "active";
+  try {
+    const rs = await fetchSubscription(subscriptionId);
+    start = rs.current_start ? new Date(rs.current_start * 1000) : null;
+    end = rs.current_end ? new Date(rs.current_end * 1000) : null;
+    status = rs.status;
+  } catch { /* dates fall back to today + 30 days */ }
+  applySubscriptionCharge({ customerId: customer.id, planId: sub.planId, subscriptionId, paymentId, amountInr: plan?.priceInr ?? 0, start, end, rzpStatus: status });
   setStep(customer.id, 2);
   return { ok: true };
 }

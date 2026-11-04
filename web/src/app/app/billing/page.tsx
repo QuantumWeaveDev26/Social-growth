@@ -4,12 +4,13 @@ import { requireCustomer } from "@/lib/auth";
 import { razorpayLive } from "@/lib/razorpay";
 import { daysLeft } from "@/lib/billing";
 import { inr } from "@/lib/format";
-import { RenewForm } from "./RenewForm";
+import { PlanForm, StopAutopay } from "./RenewForm";
+import { remakeAllowance } from "@/lib/remakes";
 
 export const metadata = { title: "Billing" };
 const day = (d: Date | null) => (d ? new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" }).format(d) : "—");
 
-export default async function Billing({ searchParams }: { searchParams: Promise<{ renewed?: string }> }) {
+export default async function Billing({ searchParams }: { searchParams: Promise<{ renewed?: string; autopay?: string }> }) {
   const sp = await searchParams;
   const { customer } = await requireCustomer();
   const sub = db.select().from(schema.subscriptions).where(eq(schema.subscriptions.customerId, customer.id)).get();
@@ -18,12 +19,23 @@ export default async function Billing({ searchParams }: { searchParams: Promise<
   const history = db.select().from(schema.payments).where(eq(schema.payments.customerId, customer.id)).orderBy(desc(schema.payments.createdAt)).all().filter((p) => p.status === "paid");
   const left = daysLeft(sub?.periodEnd);
   const lapsed = sub?.status === "past_due" || left <= 0;
+  const live = razorpayLive();
+  const autopay = !!sub?.rzpSubscriptionId && ["created", "authenticated", "active", "pending"].includes(sub.rzpStatus || "");
+  const pendingPlanId = db.select().from(schema.kv).where(eq(schema.kv.key, `pending_plan:${customer.id}`)).get()?.value;
+  const pendingPlan = pendingPlanId && pendingPlanId !== sub?.planId ? plans.find((p) => p.id === pendingPlanId) : undefined;
+  const remakes = remakeAllowance(customer.id);
+  const payLine = !sub ? "" : sub.provider === "demo" ? "Demo billing: renews automatically without charging."
+    : autopay ? (sub.rzpStatus === "pending" ? "Auto-pay: last charge failed, Razorpay is retrying. Check your UPI mandate or card." : `Auto-pay is on. Next charge ${day(sub.periodEnd)}${pendingPlan ? ` on the ${pendingPlan.name} plan` : ""}.`)
+    : sub.rzpStatus === "cancelling" || sub.rzpStatus === "cancelled" ? `Auto-pay is off. The plan ends ${day(sub.periodEnd)}.`
+    : sub.rzpStatus === "halted" ? "Auto-pay stopped after failed charges. Set it up again to continue."
+    : "Auto-pay isn’t set up.";
   return (
     <main className="px-12 pb-20 pt-10">
       <header className="border-b border-line pb-6">
         <h1 className="font-display text-[2.3rem] leading-none tracking-[-0.03em]" style={{ fontWeight: 800 }}>Billing</h1>
-        <p className="mt-3 text-ink-2">Plans run for 30 days at a time. Renew early and the new period starts when the current one ends.</p>
+        <p className="mt-3 text-ink-2">Plans renew every month by auto-pay (UPI Autopay or card). Each month includes {remakes.free} free remakes; extra remakes are ₹199 a post and ₹399 a reel.</p>
       </header>
+      {sp.autopay && <p role="status" className="mt-6 rounded-[12px] bg-mint-wash px-4 py-3 text-mint-deep">Auto-pay is set up. You’ll get a receipt from Razorpay each month.</p>}
       {sp.renewed && <p role="status" className="mt-6 rounded-[12px] bg-mint-wash px-4 py-3 text-mint-deep">Renewed. Thank you. Next month will be planned automatically about 10 days before the month ends.</p>}
       <div className="mt-8 grid max-w-[1000px] grid-cols-[1fr_380px] gap-12">
         <section>
@@ -33,24 +45,42 @@ export default async function Billing({ searchParams }: { searchParams: Promise<
             <p className={`tnum mt-3 ${lapsed ? "font-semibold text-amber-deep" : "text-ink-2"}`}>
               {!sub ? "Not started" : lapsed ? `Ended ${day(sub.periodEnd)}. New content is paused until you renew; approved posts still go out.` : `Active until ${day(sub.periodEnd)} · ${left} day${left === 1 ? "" : "s"} left`}
             </p>
-            <p className="mt-1 text-sm text-ink-3">{sub?.provider === "demo" ? "Demo billing: renews automatically without charging." : "Paid with Razorpay."}</p>
+            <p className="mt-1 text-sm text-ink-3">{payLine}</p>
+            <p className="tnum mt-3 text-sm text-ink-2">Free remakes this month: <span className="font-semibold text-ink">{remakes.left} of {remakes.free} left</span> · resets {day(remakes.resetsOn)}</p>
           </div>
           <h2 className="mt-10 font-bold">Payment history</h2>
           <table className="tnum mt-3 w-full text-left text-[0.9rem]">
             <thead className="border-b border-line text-ink-2"><tr><th className="py-2 font-semibold">Date</th><th className="font-semibold">Plan</th><th className="font-semibold">Period</th><th className="font-semibold">Amount</th><th className="font-semibold">Reference</th></tr></thead>
             <tbody className="divide-y divide-line">
               {history.map((h) => (
-                <tr key={h.id}><td className="py-2.5">{day(h.createdAt)}</td><td>{plans.find((p) => p.id === h.planId)?.name}</td><td>{day(h.periodStart)} – {day(h.periodEnd)}</td><td>{h.amountInr ? inr(h.amountInr) : h.provider === "admin" ? "Added by BrandMint" : "Demo"}</td><td className="font-mono text-xs text-ink-3">{h.paymentId ?? "—"}</td></tr>
+                <tr key={h.id}><td className="py-2.5">{day(h.createdAt)}</td><td>{h.kind === "remake" ? "Extra remake" : plans.find((p) => p.id === h.planId)?.name}</td><td>{h.kind === "remake" ? "—" : `${day(h.periodStart)} – ${day(h.periodEnd)}`}</td><td>{h.amountInr ? inr(h.amountInr) : h.provider === "admin" ? "Added by BrandMint" : "Demo"}</td><td className="font-mono text-xs text-ink-3">{h.paymentId ?? "—"}</td></tr>
               ))}
               {!history.length && <tr><td colSpan={5} className="py-6 text-center text-ink-2">No payments yet.</td></tr>}
             </tbody>
           </table>
         </section>
         <aside>
-          <div className="sticky top-8 rounded-[14px] bg-sheet p-6 ring-1 ring-line">
-            <h2 className="font-bold">{lapsed ? "Renew your plan" : "Renew early or change plan"}</h2>
-            <p className="mb-4 mt-1 text-sm text-ink-2">A plan change takes effect from the next period.</p>
-            <RenewForm plans={plans} current={sub?.planId ?? "growth"} live={razorpayLive()} label={lapsed ? "Renew now" : "Pay for next period"} />
+          <div className="sticky top-8 space-y-6 rounded-[14px] bg-sheet p-6 ring-1 ring-line">
+            {!live ? (
+              <>
+                <div><h2 className="font-bold">Renew or change plan</h2><p className="mt-1 text-sm text-ink-2">Demo server: no card is charged.</p></div>
+                <PlanForm plans={plans} current={sub?.planId ?? "growth"} mode="demo" label="Renew (demo)" />
+              </>
+            ) : autopay ? (
+              <>
+                <div><h2 className="font-bold">Change plan</h2><p className="mt-1 text-sm text-ink-2">The new plan starts from your next monthly charge.</p></div>
+                <PlanForm plans={plans} current={pendingPlan?.id ?? sub?.planId ?? "growth"} mode="switch" label="Change plan" />
+                <div className="border-t border-line pt-5"><StopAutopay until={day(sub?.periodEnd ?? null)} /></div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <h2 className="font-bold">{lapsed ? "Restart your plan" : "Set up auto-pay"}</h2>
+                  <p className="mt-1 text-sm text-ink-2">{lapsed ? "You’ll be charged now and every month after." : `Nothing is charged until ${day(sub?.periodEnd ?? null)}, when your current period ends.`} Cancel any time.</p>
+                </div>
+                <PlanForm plans={plans} current={sub?.planId ?? "growth"} mode="setup" label="Set up auto-pay" />
+              </>
+            )}
           </div>
         </aside>
       </div>

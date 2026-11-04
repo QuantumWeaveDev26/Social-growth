@@ -51,6 +51,13 @@ function migrate(d: Database.Database) {
     id text primary key not null, customer_id text not null, plan_id text not null, amount_inr integer not null,
     provider text not null, order_id text, payment_id text, status text not null default 'paid',
     period_start integer, period_end integer, created_at integer not null default (unixepoch() * 1000))`);
+  const addCol = (t: string, c: string, type: string) => { const have = cols(t); if (have.length && !have.includes(c)) d.exec(`alter table ${t} add column ${c} ${type}`); };
+  addCol("payments", "kind", "text not null default 'plan'");
+  addCol("payments", "item_id", "text");
+  addCol("payments", "note", "text");
+  addCol("subscriptions", "rzp_subscription_id", "text");
+  addCol("subscriptions", "rzp_status", "text");
+  addCol("approvals", "charge", "text not null default 'free'");
   d.exec("create table if not exists kv (key text primary key not null, value text not null)");
   d.exec(`create table if not exists workers (
     id text primary key not null, host text not null, concurrency integer not null,

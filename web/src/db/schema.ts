@@ -50,6 +50,8 @@ export const subscriptions = sqliteTable("subscriptions", {
   paymentId: text("payment_id"),
   periodStart: integer("period_start", { mode: "timestamp_ms" }),
   periodEnd: integer("period_end", { mode: "timestamp_ms" }),
+  rzpSubscriptionId: text("rzp_subscription_id"), // Razorpay auto-pay subscription
+  rzpStatus: text("rzp_status"), // created | authenticated | active | pending | halted | cancelled | completed
   createdAt: now("created_at"),
 });
 
@@ -126,6 +128,7 @@ export const approvals = sqliteTable("approvals", {
   itemId: text("item_id").notNull(),
   decision: text("decision").notNull(), // approved | changes
   comment: text("comment"),
+  charge: text("charge").notNull().default("free"), // free (counts toward the monthly allowance) | paid | retry
   createdAt: now("created_at"),
 });
 
@@ -205,6 +208,9 @@ export const payments = sqliteTable("payments", {
   planId: text("plan_id").notNull(),
   amountInr: integer("amount_inr").notNull(),
   provider: text("provider").notNull(), // razorpay | demo | admin
+  kind: text("kind").notNull().default("plan"), // plan | remake
+  itemId: text("item_id"), // remake: the item it paid for
+  note: text("note"), // remake: the client's change request
   orderId: text("order_id"),
   paymentId: text("payment_id"),
   status: text("status").notNull().default("paid"), // created | paid | failed

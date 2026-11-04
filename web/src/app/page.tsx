@@ -21,7 +21,7 @@ const FAQ = [
   ["Do I need to write anything?", "No. You fill a short form about your business once. We read your website too. From that we write a brand profile you can correct, and every post comes from it."],
   ["Will anything go live without me seeing it?", "Never. Each post and reel waits on your proof sheet until you approve it. If you ask for changes, we remake it with your note and send it back."],
   ["How do you post to my accounts?", "You connect your Facebook Page and Instagram professional account through Meta’s own login. We only ask for publishing permissions, and you can disconnect at any time."],
-  ["What if I don’t like the style?", "Tell us in one line on any post. Your notes shape the next version and the rest of the month. Each plan includes revisions per post."],
+  ["What if I don’t like the style?", "Tell us in one line on any post. Your notes shape the next version and the rest of the month. Every plan includes 3 free remakes a month; extra remakes are ₹199 a post or ₹399 a reel."],
   ["Can I cancel?", "Yes. Plans are monthly. Cancel before your next cycle and nothing more is charged."],
 ];
 

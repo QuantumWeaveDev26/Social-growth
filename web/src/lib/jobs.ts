@@ -52,7 +52,7 @@ export function claimNext() {
     .orderBy(asc(schema.jobs.runAt))
     .limit(50)
     .all();
-  const next = candidates.find((j) => !SPENDING.includes(j.type) || ((!globalPause || (j.customerId != null && allow.has(j.customerId))) && !(j.customerId && paused.has(j.customerId))));
+  const next = candidates.find((j) => !SPENDING.includes(j.type) || ((!globalPause || (j.customerId != null && allow.has(j.customerId)) || j.payload.includes('"paid":true')) && !(j.customerId && paused.has(j.customerId))));
   if (!next) return null;
   const res = db
     .update(schema.jobs)

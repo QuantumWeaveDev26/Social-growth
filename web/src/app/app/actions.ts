@@ -5,16 +5,18 @@ import { and, eq, inArray, isNull, lt } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireCustomer, checkPassword, hashPassword, createSession } from "@/lib/auth";
 import { enqueue } from "@/lib/jobs";
+import { remakeAllowance, remakePrice, startRemake, fulfilPaidRemake } from "@/lib/remakes";
+import { createOrder, razorpayLive, verifySignature } from "@/lib/razorpay";
 import { currentMonth, nextMonth } from "@/lib/format";
 
 /** An approval that arrives after the planned time posts in about 10 minutes instead of never. */
 const catchUp = (slot: Date) => (slot.getTime() < Date.now() + 5 * 60_000 ? new Date(Date.now() + 10 * 60_000) : slot);
 
 async function ownItem(itemId: string) {
-  const { customer } = await requireCustomer();
+  const { user, customer } = await requireCustomer();
   const item = db.select().from(schema.contentItems).where(and(eq(schema.contentItems.id, itemId), eq(schema.contentItems.customerId, customer.id))).get();
   if (!item) throw new Error("Not found");
-  return { customer, item };
+  return { user, customer, item };
 }
 
 export async function approveItem(fd: FormData) {
@@ -28,24 +30,57 @@ export async function approveItem(fd: FormData) {
   redirect(next ? `/app/items/${next}?approved=${itemId}` : `/app?approved=${itemId}`);
 }
 
-export type ChangeState = { error?: string } | undefined;
+export type ChangeState = { error?: string; order?: { id: string; amount: number; key: string; name: string; email: string; label: string } } | undefined;
 export async function requestChanges(_: ChangeState, fd: FormData): Promise<ChangeState> {
   const itemId = String(fd.get("itemId"));
   const comment = String(fd.get("comment") || "").trim();
   const { customer, item } = await ownItem(itemId);
   if (comment.length < 4) return { error: "Say what to change, even in a few words, so the next version gets it right." };
   if (!["awaiting_approval", "failed"].includes(item.status)) return { error: "This item is already being remade." };
-  const sub = db.select().from(schema.subscriptions).where(eq(schema.subscriptions.customerId, customer.id)).get();
-  const plan = sub && db.select().from(schema.plans).where(eq(schema.plans.id, sub.planId)).get();
-  if (plan && item.status !== "failed" && item.revisionCount >= plan.revisions) return { error: `You’ve used all ${plan.revisions} revisions on this item. Approve it, or write to us and we’ll look at it by hand.` };
-  db.insert(schema.approvals).values({ itemId, decision: "changes", comment }).run();
-  db.update(schema.contentItems)
-    .set({ status: "changes_requested", revisionCount: item.status === "failed" ? item.revisionCount : item.revisionCount + 1, updatedAt: new Date() })
-    .where(eq(schema.contentItems.id, itemId))
-    .run();
-  enqueue("generate_item", { itemId }, { customerId: customer.id });
+  if (item.status === "failed") startRemake(itemId, customer.id, comment, "retry");
+  else {
+    if (remakeAllowance(customer.id).left <= 0) return { error: "You’ve used this month’s free remakes. Use the paid remake button below." };
+    startRemake(itemId, customer.id, comment, "free");
+  }
   revalidatePath("/app");
   redirect(`/app/items/${itemId}`);
+}
+
+/** Paid remake (after the monthly free ones): opens a Razorpay payment; the remake starts once it's paid. */
+export async function startPaidRemake(_: ChangeState, fd: FormData): Promise<ChangeState> {
+  const itemId = String(fd.get("itemId"));
+  const comment = String(fd.get("comment") || "").trim();
+  const { user, customer, item } = await ownItem(itemId);
+  if (comment.length < 4) return { error: "Say what to change, even in a few words, so the next version gets it right." };
+  if (item.status !== "awaiting_approval") return { error: "This item is already being remade." };
+  const allowance = remakeAllowance(customer.id);
+  if (allowance.left > 0) { startRemake(itemId, customer.id, comment, "free"); revalidatePath("/app"); redirect(`/app/items/${itemId}`); }
+  const amount = remakePrice(item.type);
+  const label = `Extra remake (${item.type === "reel" ? "reel" : "post"})`;
+  if (!razorpayLive()) {
+    // demo server: record a free demo payment and remake straight away
+    const orderId = `demo_${Date.now()}`;
+    db.insert(schema.payments).values({ customerId: customer.id, planId: allowance.planId ?? "starter", amountInr: 0, provider: "demo", kind: "remake", itemId, note: comment, orderId, status: "created" }).run();
+    fulfilPaidRemake(orderId, orderId);
+    revalidatePath("/app");
+    redirect(`/app/items/${itemId}`);
+  }
+  try {
+    const order = await createOrder(amount, `remake-${itemId.slice(0, 24)}`, { kind: "remake", itemId, customerId: customer.id });
+    db.insert(schema.payments).values({ customerId: customer.id, planId: allowance.planId ?? "starter", amountInr: amount, provider: "razorpay", kind: "remake", itemId, note: comment, orderId: order.id, status: "created" }).run();
+    return { order: { id: order.id, amount: order.amount, key: process.env.RAZORPAY_KEY_ID!, name: user.name, email: user.email, label } };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Payment could not start. Try again." };
+  }
+}
+
+export async function finishPaidRemake(orderId: string, paymentId: string, signature: string) {
+  const { customer } = await requireCustomer();
+  const p = db.select().from(schema.payments).where(and(eq(schema.payments.orderId, orderId), eq(schema.payments.customerId, customer.id))).get();
+  if (!p || !verifySignature(orderId, paymentId, signature)) return { error: "We couldn’t verify that payment. If you were charged, write to support@brandmintai.io and we’ll fix it within a day." };
+  const r = fulfilPaidRemake(orderId, paymentId);
+  revalidatePath("/app");
+  return r;
 }
 
 export async function approveAllReady(fd: FormData) {

@@ -2,7 +2,7 @@
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2, Upload } from "lucide-react";
-import { choosePlan, confirmPayment, saveBusiness, saveBrandKit, confirmProfile } from "./actions";
+import { choosePlan, confirmSubscription, saveBusiness, saveBrandKit, confirmProfile } from "./actions";
 import { SubmitButton } from "@/components/SubmitButton";
 import { FormError } from "@/components/ui";
 import { Markdown } from "@/components/Markdown";
@@ -22,14 +22,14 @@ export function PlanStep({ plans, current, live, paid }: { plans: Plan[]; curren
   const router = useRouter();
 
   useEffect(() => {
-    const o = state?.order;
+    const o = state?.checkout;
     if (!o) return;
     const open = () => {
       const rzp = new window.Razorpay!({
-        key: o.key, amount: o.amount, currency: "INR", order_id: o.id, name: "BrandMint AI", description: "Monthly content plan",
+        key: o.key, subscription_id: o.subscriptionId, name: "BrandMint AI", description: o.plan,
         prefill: { name: o.name, email: o.email }, theme: { color: "#13221D" },
-        handler: async (r: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => {
-          const res = await confirmPayment(r.razorpay_order_id, r.razorpay_payment_id, r.razorpay_signature);
+        handler: async (r: { razorpay_payment_id: string; razorpay_subscription_id: string; razorpay_signature: string }) => {
+          const res = await confirmSubscription(r.razorpay_payment_id, r.razorpay_subscription_id, r.razorpay_signature);
           if ("error" in res && res.error) setPayError(res.error); else router.refresh();
         },
       });
@@ -43,19 +43,19 @@ export function PlanStep({ plans, current, live, paid }: { plans: Plan[]; curren
       s.onerror = () => setPayError("The payment window couldn’t load. Check your connection and try again.");
       document.body.appendChild(s);
     }
-  }, [state?.order, router]);
+  }, [state?.checkout, router]);
 
   return (
     <form action={action}>
       <H>Choose your monthly plan</H>
-      <p className="mt-3 text-ink-2">You can change plans at the end of any month. Prices include GST.</p>
+      <p className="mt-3 text-ink-2">Billed monthly with auto-pay (UPI Autopay or card). Cancel or change plan any time from Billing. Prices include GST.</p>
       <div className="mt-8 divide-y divide-line overflow-hidden rounded-[14px] bg-sheet ring-1 ring-line" role="radiogroup" aria-label="Plan">
         {plans.map((p) => (
           <label key={p.id} className={`flex cursor-pointer items-center gap-5 px-6 py-5 transition-colors ${selected === p.id ? "bg-mint-wash/60" : "hover:bg-white"}`}>
             <input type="radio" name="plan" value={p.id} checked={selected === p.id} onChange={() => setSelected(p.id)} className="size-4 accent-[#1F9D74]" />
             <span className="flex-1">
               <span className="block font-semibold">{p.name}</span>
-              <span className="tnum block text-sm text-ink-2">{p.posts} posts + {p.reels} reels a month · {p.revisions === 1 ? "1 round of changes" : `${p.revisions} rounds of changes`} per item</span>
+              <span className="tnum block text-sm text-ink-2">{p.posts} posts + {p.reels} reels a month · {p.revisions} free remakes a month</span>
               <span className="mt-1 block text-xs text-ink-3">{(JSON.parse(p.features || "[]") as string[]).slice(2).join(" · ")}</span>
             </span>
             <span className="tnum font-display text-xl" style={{ fontWeight: 700 }}>{inr(p.priceInr)}</span>
@@ -66,7 +66,7 @@ export function PlanStep({ plans, current, live, paid }: { plans: Plan[]; curren
         <FormError message={state?.error || payError} />
         {!live && <p className="text-sm text-ink-3">Payments are in demo mode on this server. No card is charged.</p>}
         <SubmitButton className="btn btn-primary px-6 py-3" pending="Opening payment">
-          {paid ? "Update plan and continue" : live ? "Pay and continue" : "Activate plan (demo) and continue"}
+          {paid ? "Update plan and continue" : live ? "Set up auto-pay and continue" : "Activate plan (demo) and continue"}
         </SubmitButton>
       </div>
     </form>
