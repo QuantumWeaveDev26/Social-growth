@@ -1,0 +1,37 @@
+# LinkedIn Lab: standalone test tool, deployed separately from BrandMint (own project, own volume, own address).
+# Values come from the project environment: LAB_HOST, LAB_PASSWORD, LAB_SECRET, LINKEDIN_CLIENT_ID,
+# LINKEDIN_CLIENT_SECRET, optional LINKEDIN_PAGE_SCOPES and LINKEDIN_VERSION.
+name: linkedin-lab
+services:
+  lab:
+    build:
+      context: https://github.com/QuantumWeaveDev26/Social-growth.git#main:linkedin-lab
+    image: linkedin-lab:latest
+    pull_policy: build
+    restart: unless-stopped
+    mem_limit: 256m
+    environment:
+      BASE_URL: https://${LAB_HOST}
+      LAB_PASSWORD: ${LAB_PASSWORD:-}
+      LAB_SECRET: ${LAB_SECRET:-}
+      LINKEDIN_CLIENT_ID: ${LINKEDIN_CLIENT_ID:-}
+      LINKEDIN_CLIENT_SECRET: ${LINKEDIN_CLIENT_SECRET:-}
+      LINKEDIN_PAGE_SCOPES: ${LINKEDIN_PAGE_SCOPES:-}
+      LINKEDIN_VERSION: ${LINKEDIN_VERSION:-202610}
+    volumes:
+      - lab-data:/data
+    networks: [ingress]
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: n8n_default
+      traefik.http.routers.linkedin-lab.rule: "Host(`${LAB_HOST}`)"
+      traefik.http.routers.linkedin-lab.entrypoints: websecure
+      traefik.http.routers.linkedin-lab.tls: "true"
+      traefik.http.routers.linkedin-lab.tls.certresolver: mytlschallenge
+      traefik.http.services.linkedin-lab.loadbalancer.server.port: "8080"
+volumes:
+  lab-data:
+networks:
+  ingress:
+    external: true
+    name: n8n_default
