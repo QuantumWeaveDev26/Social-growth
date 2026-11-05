@@ -28,6 +28,7 @@ export type CreatorReport = {
   topics: { theme: string; share_pct?: number }[];
   ctas: { pattern: string; how_often?: string }[];
   voice: { tone: string; signature_moves: string[] };
+  signature_lines?: { template: string; used_for: string }[];
   best_performers?: { what: string; why: string }[];
   adapt_for_small_business: string[];
   avoid: string[];
@@ -78,8 +79,11 @@ Rules:
 - Describe PATTERNS, not content. Write every hook and structure as a reusable template with [placeholders], e.g. "I [did surprising thing] for [time]. Here's what happened:".
 - Never quote more than 8 consecutive words from any post. Do not reproduce their stories, numbers or claims.
 - Only report engagement-based "best performers" if reaction/comment counts are actually visible in the text; otherwise leave that list empty.
-- share_pct values are your estimate of how often a pattern appears among the posts (0–100), only when you can tell.
-- "adapt_for_small_business": concrete rules for using these patterns in posts for Indian small businesses (cafés, salons, clinics, D2C brands, coaches), written for the business owner's own LinkedIn profile or Company Page.
+- share_pct values are your estimate of how often a pattern appears among the posts (0–100), only when you can tell. Patterns can overlap, so they need not add up to 100.
+- "posting_rhythm": work it out from the relative timestamps on each post (e.g. "1h", "2d", "1w", "1mo"). Count how many posts fall in the last 7 days and the last 30 days and state it plainly, e.g. "about 1 a day, sometimes 2". Do not claim more than the timestamps show.
+- "typical_length_words": estimate from the actual posts and give the usual range plus the occasional long ones, e.g. "80–200 words; a few long posts of 350+".
+- "signature_lines": the creator's recurring pivot, transition and closing lines (the moves they reuse across many posts), written as short templates with [placeholders], e.g. "But here's the [catch] nobody is talking about." Only lines that recur in 3 or more posts. Each template must stay under 12 words. Generalise them into a move anyone could use; never reproduce the creator's own tagline, sign-off or community/newsletter plug, even with a placeholder (describe that habit under "ctas" instead).
+- "adapt_for_small_business": concrete rules for using these patterns in posts for Indian small businesses (cafés, salons, clinics, gyms, boutiques, D2C brands, tutors), written for the business owner's own LinkedIn profile or Company Page. Talk in things an owner actually sees: walk-ins, bookings, WhatsApp enquiries, repeat customers, reviews, busy hours. No corporate metrics such as "conversion lift", CAC or funnels.
 - "avoid": things this creator does that would not suit small businesses, or that read as hype/bait.
 
 Return JSON exactly in this shape:
@@ -90,6 +94,7 @@ Return JSON exactly in this shape:
  "topics": [{"theme": string, "share_pct": number}],
  "ctas": [{"pattern": string, "how_often": string}],
  "voice": {"tone": string, "signature_moves": [string]},
+ "signature_lines": [{"template": string, "used_for": string}],
  "best_performers": [{"what": string, "why": string}],
  "adapt_for_small_business": [string], "avoid": [string]}`;
 
@@ -108,7 +113,7 @@ export async function runCreatorStudy(id: string) {
     const d = r.data;
     const report: CreatorReport = {
       ...d, posts_analysed: Number(d.posts_analysed) || 0, hook_patterns: arr(d.hook_patterns), structures: arr(d.structures), topics: arr(d.topics),
-      ctas: arr(d.ctas), best_performers: arr(d.best_performers), adapt_for_small_business: arr(d.adapt_for_small_business), avoid: arr(d.avoid),
+      ctas: arr(d.ctas), signature_lines: arr(d.signature_lines), best_performers: arr(d.best_performers), adapt_for_small_business: arr(d.adapt_for_small_business), avoid: arr(d.avoid),
       formatting: d.formatting || {}, voice: { tone: d.voice?.tone || "", signature_moves: arr(d.voice?.signature_moves) },
     };
     save({ status: "done", report, engine: r.engine, costUsd: r.costUsd, error: undefined });
@@ -124,6 +129,7 @@ BrandMint writes LinkedIn posts for Indian small businesses (cafés, salons, cli
 
 Write the playbook in plain Markdown with these headings, in this order:
 ## Hooks: 10–15 hook templates with [placeholders], each with a one-line "use when".
+## Signature lines: 6–10 short pivot, transition and closing line templates that make posts feel written by a person.
 ## Post structures: 5–8 structures as short numbered outlines, each with "best for".
 ## Formatting rules: length, line breaks, emoji, lists, hashtags (number and placement), links.
 ## Calls to action: patterns that fit small businesses (WhatsApp, visit, book, comment).
@@ -131,7 +137,7 @@ Write the playbook in plain Markdown with these headings, in this order:
 ## Rhythm: suggested weekly mix of post types.
 ## Never do: bait, hype and anything that hurts trust.
 
-Rules: templates and rules only, no creator's sentences, stories, names or numbers. Keep it under 1,400 words. Prefer patterns that appear across several creators.
+Rules: talk in things a small-business owner sees (walk-ins, bookings, WhatsApp enquiries, repeat customers, reviews), never corporate metrics. Templates and rules only, no creator's sentences, stories, names or numbers. Keep it under 1,400 words. Prefer patterns that appear across several creators.
 Return JSON: {"markdown": string}`;
 
 export async function runCreatorSynthesis() {

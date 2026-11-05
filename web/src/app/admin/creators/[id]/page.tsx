@@ -87,6 +87,12 @@ export default async function CreatorPage({ params }: { params: Promise<{ id: st
             <ul className="space-y-3">{r.structures.map((x, i) => <li key={i}><p className="font-semibold">{x.name} <span className="font-normal text-ink-3">· {x.used_for}</span></p><p className="mt-1 whitespace-pre-line text-sm text-ink-2">{x.outline}</p></li>)}</ul>
           </Block>
 
+          {!!r.signature_lines?.length && (
+            <Block title="Signature lines">
+              <ul className="space-y-2">{r.signature_lines.map((x, i) => <li key={i}><p className="rounded-[8px] bg-white px-3 py-2 font-mono text-[0.85rem] ring-1 ring-line">{x.template}</p><p className="mt-1 text-sm text-ink-2">{x.used_for}</p></li>)}</ul>
+            </Block>
+          )}
+
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <Block title="Formatting">
               <dl className="space-y-1.5 text-sm">{Object.entries(r.formatting || {}).filter(([, v]) => v).map(([k, v]) => <div key={k} className="grid grid-cols-[120px_minmax(0,1fr)] gap-2"><dt className="capitalize text-ink-3">{k.replace(/_/g, " ")}</dt><dd>{v}</dd></div>)}</dl>
