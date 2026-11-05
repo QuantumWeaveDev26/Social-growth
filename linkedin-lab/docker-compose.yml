@@ -1,16 +1,19 @@
 # LinkedIn Lab: standalone test tool, deployed separately from BrandMint (own project, own volume, own address).
-# Values come from the project environment: LAB_HOST, LAB_PASSWORD, LAB_SECRET, LINKEDIN_CLIENT_ID,
+# Deploy by pasting this file as raw YAML (not by URL). Values come from the project environment: LAB_HOST, LAB_REF, LAB_PASSWORD, LAB_SECRET, LINKEDIN_CLIENT_ID,
 # LINKEDIN_CLIENT_SECRET, optional LINKEDIN_PAGE_SCOPES and LINKEDIN_VERSION.
 name: linkedin-lab
 services:
   lab:
-    build:
-      context: https://github.com/QuantumWeaveDev26/Social-growth.git#main:linkedin-lab
-    image: linkedin-lab:latest
-    pull_policy: build
+    # No build step: Hostinger's project manager can't build from a repo subfolder (it picked the root
+    # compose file instead). The stock Node image fetches server.mjs pinned to a commit; bump LAB_REF to update.
+    image: node:22-alpine
     restart: unless-stopped
     mem_limit: 256m
+    working_dir: /app
+    command: ["sh", "-c", "wget -qO /app/server.mjs https://raw.githubusercontent.com/QuantumWeaveDev26/Social-growth/${LAB_REF:-main}/linkedin-lab/server.mjs && exec node /app/server.mjs"]
     environment:
+      PORT: "8080"
+      DATA_DIR: /data
       BASE_URL: https://${LAB_HOST}
       LAB_PASSWORD: ${LAB_PASSWORD:-}
       LAB_SECRET: ${LAB_SECRET:-}
