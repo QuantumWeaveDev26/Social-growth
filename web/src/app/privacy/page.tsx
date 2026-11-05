@@ -3,10 +3,10 @@ export const metadata = { title: "Privacy policy" };
 export default function Privacy() {
   const H = ({ children }: { children: React.ReactNode }) => <h2 className="mt-8 text-lg font-bold text-ink">{children}</h2>;
   return (
-    <div className="min-h-dvh px-10 py-8">
+    <div className="min-h-dvh px-4 py-6 sm:px-10 sm:py-8">
       <Wordmark />
-      <main className="mx-auto mt-14 max-w-[680px] leading-relaxed text-ink-2">
-        <h1 className="font-display text-[2.2rem] tracking-[-0.03em] text-ink" style={{ fontWeight: 800 }}>Privacy policy</h1>
+      <main className="mx-auto mt-8 max-w-[680px] break-words sm:mt-14 leading-relaxed text-ink-2">
+        <h1 className="font-display text-[1.8rem] sm:text-[2.2rem] tracking-[-0.03em] text-ink" style={{ fontWeight: 800 }}>Privacy policy</h1>
         <p className="mt-3">BrandMint AI Private Limited (“we”) makes and schedules social media content for businesses. This page explains what we collect and why.</p>
         <H>What we collect</H>
         <p>Your name, email and password (stored as a one-way hash); the business details, logo and colours you give us; your plan and payment reference from Razorpay (we never see card numbers); and, when you connect Meta, your Facebook Page ID and name, Instagram account ID and username, and an access token.</p>

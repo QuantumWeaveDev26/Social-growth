@@ -18,12 +18,12 @@ export function DetailsForm({ d }: { d: D }) {
   return (
     <form action={action} className="space-y-5">
       <T id="products" d={d} rows={6} label="Products or services, with prices" ph={"Masala chai — ₹30\nBun maska — ₹60 (butter, grilled on tawa)\nBreakfast set — ₹180: 2 idli, vada, filter coffee"} hint="One per line: name, price, what's included. We only ever use prices you write here." />
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div><label className="label" htmlFor="whatsapp">WhatsApp</label><input id="whatsapp" name="whatsapp" defaultValue={d.whatsapp} className="field" /></div>
         <div><label className="label" htmlFor="phone">Phone</label><input id="phone" name="phone" defaultValue={d.phone} className="field" /></div>
         <div><label className="label" htmlFor="address">Address or area</label><input id="address" name="address" defaultValue={d.address} className="field" /></div>
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div><label className="label" htmlFor="hours">Opening hours</label><input id="hours" name="hours" defaultValue={d.hours} placeholder="Mon–Sat 7 am – 10 pm" className="field" /></div>
         <div><label className="label" htmlFor="order_link">Order or booking link</label><input id="order_link" name="order_link" defaultValue={d.order_link} placeholder="Swiggy, Zomato, booking page…" className="field" /></div>
       </div>

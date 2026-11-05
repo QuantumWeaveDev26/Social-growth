@@ -16,7 +16,7 @@ export default async function KnowledgePage() {
         <p className="mb-3 text-sm text-ink-2">Upload a file with <code>=== SECTION: core ===</code>, <code>=== SECTION: reels ===</code> … markers to fill several sections at once.</p>
         <UploadForm />
       </div>
-      <div className="mt-6 grid grid-cols-2 gap-6">
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
         {KB_SECTIONS.map((s) => <SectionForm key={s.id} id={s.id} label={s.label} hint={s.hint} text={kbGet(s.id)} />)}
       </div>
     </AdminShell>

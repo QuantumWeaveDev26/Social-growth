@@ -21,7 +21,7 @@ export function SectionForm({ id, label, hint, text }: { id: string; label: stri
   return (
     <form action={action} className="rounded-[14px] bg-sheet p-5 ring-1 ring-line">
       <input type="hidden" name="id" value={id} />
-      <div className="flex items-baseline justify-between gap-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h2 className="font-bold">{label}</h2>
         <span className="tnum text-xs text-ink-3">{text.trim() ? `${text.trim().split(/\s+/).length.toLocaleString("en-IN")} words` : "empty"}</span>
       </div>

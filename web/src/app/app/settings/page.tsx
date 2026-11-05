@@ -17,25 +17,25 @@ export default async function Settings({ searchParams }: { searchParams: Promise
   const times = JSON.parse(customer.postingTimes || '["10:00","18:30"]') as string[];
   const colours = JSON.parse(customer.brandColors || '["#1F9D74","#13221D"]') as string[];
   return (
-    <main className="px-12 pb-20 pt-10">
+    <main className="px-4 sm:px-8 lg:px-12 pb-20 pt-6 lg:pt-10">
       <header className="border-b border-line pb-6">
-        <h1 className="font-display text-[2.3rem] leading-none tracking-[-0.03em]" style={{ fontWeight: 800 }}>Connections</h1>
+        <h1 className="font-display text-[1.85rem] sm:text-[2.3rem] leading-none tracking-[-0.03em]" style={{ fontWeight: 800 }}>Connections</h1>
         <p className="mt-3 text-ink-2">Signed in as {user.email}</p>
       </header>
       <div className="max-w-[820px] divide-y divide-line">
-        <section className="grid grid-cols-[220px_1fr] gap-10 py-9">
+        <section className="grid grid-cols-1 gap-4 md:grid-cols-[220px_minmax(0,1fr)] md:gap-10 py-9">
           <div><h2 className="font-bold">Instagram and Facebook</h2><p className="mt-1 text-sm text-ink-2">Where approved content is posted.</p></div>
           <div>
             <MetaConnect conn={conn} message={sp.meta} disconnect={disconnectMeta} check={checkMeta} />
           </div>
         </section>
 
-        <section className="grid grid-cols-[220px_1fr] gap-10 py-9">
+        <section className="grid grid-cols-1 gap-4 md:grid-cols-[220px_minmax(0,1fr)] md:gap-10 py-9">
           <div><h2 className="font-bold">Plan</h2><p className="mt-1 text-sm text-ink-2">Billed every 30 days.</p></div>
           <p className="text-ink-2">{plan ? `${plan.name} · ${plan.posts} posts and ${plan.reels} reels a month.` : "No active plan."} <a href="/app/billing" className="font-semibold text-mint-deep underline">Billing and renewals</a></p>
         </section>
 
-        <form action={saveSettings} className="grid grid-cols-[220px_1fr] gap-10 py-9">
+        <form action={saveSettings} className="grid grid-cols-1 gap-4 md:grid-cols-[220px_minmax(0,1fr)] md:gap-10 py-9">
           <div><h2 className="font-bold">Posting and colours</h2><p className="mt-1 text-sm text-ink-2">Applies to the next month you plan.</p></div>
           <div className="space-y-6">
             {sp.saved && <p role="status" className="rounded-[10px] bg-mint-wash px-3 py-2 text-sm text-mint-deep">Saved.</p>}

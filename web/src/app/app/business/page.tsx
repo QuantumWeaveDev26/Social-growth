@@ -16,12 +16,12 @@ export default async function BusinessPage() {
   const done = CHECKS.filter(([k]) => has(k)).length;
   const pct = Math.round((done / CHECKS.length) * 100);
   return (
-    <main className="px-12 pb-20 pt-10">
+    <main className="px-4 sm:px-8 lg:px-12 pb-20 pt-6 lg:pt-10">
       <header className="border-b border-line pb-6">
-        <h1 className="font-display text-[2.3rem] leading-none tracking-[-0.03em]" style={{ fontWeight: 800 }}>Business details</h1>
+        <h1 className="font-display text-[1.85rem] sm:text-[2.3rem] leading-none tracking-[-0.03em]" style={{ fontWeight: 800 }}>Business details</h1>
         <p className="mt-3 max-w-[70ch] text-ink-2">The more we know, the more your posts and reels sound and look like you. We never invent prices, offers or claims, so anything missing here simply stays out of your content.</p>
       </header>
-      <div className="mt-8 grid max-w-[1100px] grid-cols-[1fr_340px] gap-12">
+      <div className="mt-8 grid max-w-[1100px] grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-12">
         <section className="space-y-10">
           <DetailsForm d={d} />
           <div>
@@ -29,7 +29,7 @@ export default async function BusinessPage() {
             <p className="mt-1 text-sm text-ink-2">Your shop, products, team at work. We use them as reference so your content looks like your business, not a stock café.</p>
             <div className="mt-3"><PhotoForm /></div>
             {!!photos.length && (
-              <ul className="mt-4 grid grid-cols-5 gap-3">
+              <ul className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-5">
                 {photos.map((p) => (
                   <li key={p} className="relative">
                     {/* eslint-disable-next-line @next/next/no-img-element */}

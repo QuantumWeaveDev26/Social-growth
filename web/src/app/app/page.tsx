@@ -35,13 +35,13 @@ export default async function ProofSheet({ searchParams }: { searchParams: Promi
 
   if (!plan) {
     return (
-      <main className="px-12 py-12">
+      <main className="px-4 sm:px-8 lg:px-12 py-8 lg:py-12">
         <AutoRefresh active={!!planJob} />
         <h1 className="font-display text-[2.2rem] tracking-[-0.03em]" style={{ fontWeight: 800 }}>{planJob ? "Planning your month" : "Your proof sheet is empty"}</h1>
         {planJob ? (
           <>
             <p className="mt-3 max-w-[60ch] text-ink-2">We’re choosing topics from your brand profile and spacing them across the month. Frames will appear here as each post is made, usually within a few minutes.</p>
-            <div className="mt-10 grid grid-cols-6 gap-3">{Array.from({ length: 12 }).map((_, i) => <div key={i} className="developing aspect-square rounded-[8px]" />)}</div>
+            <div className="mt-10 grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">{Array.from({ length: 12 }).map((_, i) => <div key={i} className="developing aspect-square rounded-[8px]" />)}</div>
           </>
         ) : (
           <>
@@ -73,12 +73,12 @@ export default async function ProofSheet({ searchParams }: { searchParams: Promi
   const fmtWeek = (k: string) => new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(k));
 
   return (
-    <main className="px-12 pb-20 pt-10">
+    <main className="px-4 sm:px-8 lg:px-12 pb-20 pt-6 lg:pt-10">
       <AutoRefresh active={counts.making > 0} />
-      <header className="flex items-end justify-between gap-8 border-b border-line pb-6">
+      <header className="flex flex-wrap items-end justify-between gap-4 border-b lg:gap-8 border-line pb-6">
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="font-display text-[2.3rem] leading-none tracking-[-0.03em]" style={{ fontWeight: 800 }}>{monthLabel(plan.month)}</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="font-display text-[1.85rem] sm:text-[2.3rem] leading-none tracking-[-0.03em]" style={{ fontWeight: 800 }}>{monthLabel(plan.month)}</h1>
             {plans.length > 1 && (
               <nav className="flex gap-1 text-sm" aria-label="Month">
                 {plans.map((p) => (
@@ -91,7 +91,7 @@ export default async function ProofSheet({ searchParams }: { searchParams: Promi
             {posts} posts and {items.length - posts} reels · <span className="font-semibold text-ink">{counts.review} to review</span> · {counts.approved} approved{counts.making ? ` · ${counts.making} being made` : ""}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {ready > 0 && (
             <form action={approveAllReady}>
               <input type="hidden" name="planId" value={plan.id} />
@@ -110,12 +110,12 @@ export default async function ProofSheet({ searchParams }: { searchParams: Promi
         </p>
       )}
 
-      <nav className="mt-6 flex gap-1.5" aria-label="Filter">
+      <nav className="-mx-4 mt-6 flex gap-1.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0" aria-label="Filter">
         {FILTERS.map((f) => {
           const n = f.id === "all" ? items.length : counts[f.id];
           return (
             <Link key={f.id} href={`/app?month=${plan.month}&show=${f.id}`} aria-current={show === f.id ? "true" : undefined}
-              className={`tnum rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${show === f.id ? "bg-ink text-white" : "bg-sheet text-ink-2 ring-1 ring-line hover:text-ink"}`}>
+              className={`tnum shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${show === f.id ? "bg-ink text-white" : "bg-sheet text-ink-2 ring-1 ring-line hover:text-ink"}`}>
               {f.label} <span className={show === f.id ? "text-rail-text" : "text-ink-3"}>{n}</span>
             </Link>
           );
@@ -129,7 +129,7 @@ export default async function ProofSheet({ searchParams }: { searchParams: Promi
           {[...weeks.entries()].map(([wk, list]) => (
             <section key={wk} aria-label={`Week of ${fmtWeek(wk)}`}>
               <h2 className="tnum mb-3 text-[0.95rem] font-semibold text-ink-2">Week of {fmtWeek(wk)}</h2>
-              <ul className="grid grid-cols-6 gap-x-3 gap-y-5">
+              <ul className="grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
                 {list.map((it) => {
                   const brief = JSON.parse(it.brief);
                   const copy = it.copy ? JSON.parse(it.copy) : null;

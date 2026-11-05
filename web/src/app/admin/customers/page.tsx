@@ -81,14 +81,14 @@ export default async function Clients({ searchParams }: { searchParams: Promise<
             </Link>
           ))}
         </nav>
-        <form action="/admin/customers" className="flex items-center gap-2">
+        <form action="/admin/customers" className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           {show !== "all" && <input type="hidden" name="show" value={show} />}
-          <label className="relative block w-80">
+          <label className="relative block w-full sm:w-80">
             <span className="sr-only">Search clients</span>
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-3" aria-hidden />
             <input name="q" defaultValue={sp.q} placeholder="Business, email or @handle" className="field w-full py-2" style={{ paddingLeft: "2.25rem" }} />
           </label>
-          <select name="sort" defaultValue={sort} className="field py-2" style={{ width: "12rem" }} aria-label="Sort by">
+          <select name="sort" defaultValue={sort} className="field min-w-0 flex-1 py-2 sm:w-48 sm:flex-none" aria-label="Sort by">
             {SORTS.map((s) => <option key={s.id} value={s.id}>Sort: {s.label}</option>)}
           </select>
           <button className="btn btn-ghost py-2">Apply</button>

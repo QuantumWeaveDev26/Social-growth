@@ -41,7 +41,7 @@ export default async function AdminOverview() {
 
   return (
     <AdminShell active="overview" email={admin.email} badges={{ clients: attention.filter((r) => r.issues.some((i) => i.level === "red")).length, jobs: failedJobs }}>
-      <div className="grid grid-cols-4 gap-3 xl:grid-cols-7">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-7">
         <Kpi label="Active clients" value={active} sub={`${onboarding} in setup · ${pausedClients} paused`} href="/admin/customers?show=active" />
         <Kpi label="Monthly revenue" value={inr(mrr)} sub="active plans, incl. GST" />
         <Kpi label="Renewals in 7 days" value={renewals} href="/admin/customers?sort=renewal" />
@@ -51,7 +51,7 @@ export default async function AdminOverview() {
         <Kpi label="AI spend" value={usd(spend)} sub="latest month of each client" />
       </div>
 
-      <form action={toggleGeneration} className={`mt-6 flex items-center justify-between gap-6 rounded-[14px] px-5 py-4 ${paused ? "bg-amber-wash" : "bg-sheet ring-1 ring-line"}`}>
+      <form action={toggleGeneration} className={`mt-6 flex flex-wrap items-center justify-between gap-4 rounded-[14px] px-5 py-4 ${paused ? "bg-amber-wash" : "bg-sheet ring-1 ring-line"}`}>
         <input type="hidden" name="pause" value={paused ? "0" : "1"} />
         <p className={paused ? "text-amber-deep" : "text-ink-2"}>
           {paused ? <><span className="font-semibold">AI generation is paused.</span> Nothing new is written or designed, so no AI credit is spent. Publishing approved posts and emails continue.</> : <>AI generation is running for all active clients. Pausing holds every queued item until you resume.</>}
@@ -64,7 +64,7 @@ export default async function AdminOverview() {
         </div>
       </form>
 
-      <div className="mt-8 grid grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-8">
+      <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <section>
           <div className="flex items-baseline justify-between">
             <h2 className="text-lg font-bold">Needs attention <span className="tnum font-normal text-ink-3">· {attention.length}</span></h2>

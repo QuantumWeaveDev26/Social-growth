@@ -30,32 +30,32 @@ export default async function Landing() {
   const user = await currentUser();
   return (
     <div className="bg-paper">
-      <header className="mx-auto flex max-w-[1240px] items-center justify-between px-8 py-6">
+      <header className="mx-auto flex max-w-[1240px] items-center justify-between gap-4 px-4 py-5 sm:px-8 sm:py-6">
         <Wordmark />
-        <nav className="flex items-center gap-7 text-[0.93rem] font-medium text-ink-2">
-          <a href="#how" className="hover:text-ink">How it works</a>
-          <a href="#pricing" className="hover:text-ink">Pricing</a>
-          <a href="#faq" className="hover:text-ink">Questions</a>
+        <nav className="flex items-center gap-4 text-[0.93rem] font-medium text-ink-2 md:gap-7">
+          <a href="#how" className="hidden hover:text-ink md:inline">How it works</a>
+          <a href="#pricing" className="hidden hover:text-ink md:inline">Pricing</a>
+          <a href="#faq" className="hidden hover:text-ink md:inline">Questions</a>
           {user ? (
-            <Link href={user.role === "admin" ? "/admin" : "/app"} className="btn btn-primary">Open your studio</Link>
+            <Link href={user.role === "admin" ? "/admin" : "/app"} className="btn btn-primary whitespace-nowrap">Open your studio</Link>
           ) : (
             <>
               <Link href="/login" className="hover:text-ink">Sign in</Link>
-              <Link href="/signup" className="btn btn-primary">Start your month</Link>
+              <Link href="/signup" className="btn btn-primary whitespace-nowrap"><span className="sm:hidden">Start</span><span className="hidden sm:inline">Start your month</span></Link>
             </>
           )}
         </nav>
       </header>
 
-      <section className="mx-auto grid max-w-[1240px] grid-cols-[1fr_1.08fr] items-center gap-16 px-8 pb-24 pt-14">
+      <section className="mx-auto grid max-w-[1240px] grid-cols-1 items-center gap-12 px-4 pb-16 pt-8 sm:px-8 lg:grid-cols-[1fr_1.08fr] lg:gap-16 lg:pb-24 lg:pt-14">
         <div>
-          <h1 className="font-display text-[4.1rem] leading-[0.98] tracking-[-0.035em]" style={{ fontWeight: 800 }}>
+          <h1 className="font-display text-[2.6rem] leading-[1] tracking-[-0.035em] sm:text-[3.4rem] xl:text-[4.1rem] xl:leading-[0.98]" style={{ fontWeight: 800 }}>
             A month of posts,<br />made for your business.<br /><span className="text-mint-deep">You just tick.</span>
           </h1>
-          <p className="mt-7 max-w-[34rem] text-[1.15rem] leading-relaxed text-ink-2">
+          <p className="mt-6 max-w-[34rem] text-[1.05rem] leading-relaxed text-ink-2 sm:mt-7 sm:text-[1.15rem]">
             Tell us what you sell and who buys it. BrandMint AI writes, designs and schedules your Instagram and Facebook posts and reels. Every piece waits for your approval before it goes live.
           </p>
-          <div className="mt-9 flex items-center gap-4">
+          <div className="mt-8 flex flex-wrap items-center gap-3 sm:mt-9 sm:gap-4">
             <Link href="/signup" className="btn btn-primary px-6 py-3 text-base">Start your month <ArrowRight className="size-4" /></Link>
             <a href="#pricing" className="btn btn-ghost px-5 py-3 text-base">See plans from {inr(plans[0]?.priceInr ?? 3999)}</a>
           </div>
@@ -63,12 +63,12 @@ export default async function Landing() {
         </div>
 
         {/* The proof sheet: the product, shown as the product */}
-        <div className="relative rounded-[18px] bg-sheet p-5 shadow-[var(--shadow-lift)] ring-1 ring-line">
-          <div className="mb-4 flex items-baseline justify-between px-1">
+        <div className="relative rounded-[18px] bg-sheet p-3 sm:p-5 shadow-[var(--shadow-lift)] ring-1 ring-line">
+          <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-1">
             <span className="font-display text-lg" style={{ fontWeight: 700 }}>November proof sheet</span>
             <span className="tnum text-sm text-ink-3">2 approved · 1 redoing · 3 to review</span>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
             {SHEET.map((s, i) => (
               <figure key={i} className="group relative">
                 <div className="relative aspect-square overflow-hidden rounded-[8px] bg-[#e7ece9]">
@@ -91,18 +91,18 @@ export default async function Landing() {
       </section>
 
       <section id="how" className="border-y border-line bg-sheet">
-        <div className="mx-auto max-w-[1240px] px-8 py-24">
-          <h2 className="max-w-[40rem] font-display text-[2.6rem] leading-[1.05] tracking-[-0.03em]" style={{ fontWeight: 800 }}>
+        <div className="mx-auto max-w-[1240px] px-4 py-16 sm:px-8 lg:py-24">
+          <h2 className="max-w-[40rem] font-display text-[2rem] leading-[1.05] sm:text-[2.6rem] tracking-[-0.03em]" style={{ fontWeight: 800 }}>
             From a short form to a posted month, without writing a caption.
           </h2>
-          <ol className="mt-14 grid grid-cols-4 border-t border-ink">
+          <ol className="mt-10 grid grid-cols-1 border-t border-ink sm:grid-cols-2 lg:mt-14 lg:grid-cols-4">
             {[
               ["Tell us about the business", "What you sell, who buys, what makes you different, your offers. We also read your website."],
               ["Check your brand profile", "We write how your brand sounds and the themes it posts about. Correct anything that is off."],
               ["Approve the proof sheet", "Your month arrives as a contact sheet. Tick what you like. Leave a note on what you don’t, and we remake it."],
               ["We post on schedule", "Approved posts and reels go to your Instagram and Facebook at the times your audience is online."],
             ].map(([t, d], i) => (
-              <li key={i} className={`pr-8 pt-6 ${i ? "border-l border-line pl-8" : ""}`}>
+              <li key={i} className={`pb-6 pt-6 sm:pr-8 ${i ? "border-t border-line sm:border-t-0" : ""} ${i % 2 ? "sm:border-l sm:pl-8" : ""} ${i >= 2 ? "sm:border-t lg:border-t-0" : ""} ${i ? "lg:border-l lg:pl-8" : ""}`}>
                 <span className="tnum font-display text-sm text-mint-deep" style={{ fontWeight: 700 }}>Step {i + 1}</span>
                 <h3 className="mt-2 text-[1.15rem] font-bold">{t}</h3>
                 <p className="mt-2 text-[0.95rem] leading-relaxed text-ink-2">{d}</p>
@@ -112,19 +112,19 @@ export default async function Landing() {
         </div>
       </section>
 
-      <section id="pricing" className="mx-auto max-w-[1240px] px-8 py-24">
-        <div className="flex items-end justify-between gap-10">
-          <h2 className="max-w-[34rem] font-display text-[2.6rem] leading-[1.05] tracking-[-0.03em]" style={{ fontWeight: 800 }}>
+      <section id="pricing" className="mx-auto max-w-[1240px] px-4 py-16 sm:px-8 lg:py-24">
+        <div className="flex flex-wrap items-end justify-between gap-6 lg:gap-10">
+          <h2 className="max-w-[34rem] font-display text-[2rem] leading-[1.05] sm:text-[2.6rem] tracking-[-0.03em]" style={{ fontWeight: 800 }}>
             Pick how much you want to post.
           </h2>
           <p className="max-w-[26rem] text-ink-2">Every plan includes strategy, design, captions, hashtags, scheduling and your approval step. Prices are per month, including GST.</p>
         </div>
-        <div className="mt-12 grid overflow-hidden rounded-[16px] bg-sheet ring-1 ring-line" style={{ gridTemplateColumns: `repeat(${Math.max(plans.length, 1)}, minmax(0, 1fr))` }}>
+        <div className={`mt-10 grid grid-cols-1 overflow-hidden rounded-[16px] bg-sheet ring-1 ring-line lg:mt-12 ${plans.length >= 3 ? "md:grid-cols-3" : plans.length === 2 ? "md:grid-cols-2" : ""}`}>
           {plans.map((p, i) => {
             const featured = p.id === "growth";
             const features = JSON.parse(p.features) as string[];
             return (
-              <div key={p.id} className={`flex flex-col p-8 ${i ? "border-l border-line" : ""} ${featured ? "bg-ink text-white" : ""}`}>
+              <div key={p.id} className={`flex flex-col p-6 sm:p-8 ${i ? "border-t border-line md:border-l md:border-t-0" : ""} ${featured ? "bg-ink text-white" : ""}`}>
                 <div className="flex items-center justify-between">
                   <h3 className="font-display text-xl" style={{ fontWeight: 700 }}>{p.name}</h3>
                   {featured && <span className="chip bg-mint text-white">Best for Growth</span>}
@@ -150,14 +150,14 @@ export default async function Landing() {
       </section>
 
       <section id="faq" className="border-t border-line bg-sheet">
-        <div className="mx-auto grid max-w-[1240px] grid-cols-[1fr_1.6fr] gap-16 px-8 py-24">
-          <h2 className="font-display text-[2.6rem] leading-[1.05] tracking-[-0.03em]" style={{ fontWeight: 800 }}>Questions owners ask first.</h2>
+        <div className="mx-auto grid max-w-[1240px] grid-cols-1 gap-8 px-4 py-16 sm:px-8 lg:grid-cols-[1fr_1.6fr] lg:gap-16 lg:py-24">
+          <h2 className="font-display text-[2rem] leading-[1.05] sm:text-[2.6rem] tracking-[-0.03em]" style={{ fontWeight: 800 }}>Questions owners ask first.</h2>
           <dl className="divide-y divide-line border-y border-line">
             {FAQ.map(([q, a]) => (
               <details key={q} className="group py-5">
-                <summary className="flex cursor-pointer list-none items-center justify-between text-[1.05rem] font-semibold">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-[1rem] font-semibold sm:text-[1.05rem]">
                   {q}
-                  <Plus className="ml-6 size-5 shrink-0 text-ink-3 transition-transform duration-300 group-open:rotate-45" aria-hidden />
+                  <Plus className="size-5 shrink-0 text-ink-3 transition-transform duration-300 group-open:rotate-45" aria-hidden />
                 </summary>
                 <p className="mt-3 max-w-[60ch] leading-relaxed text-ink-2">{a}</p>
               </details>
@@ -167,10 +167,10 @@ export default async function Landing() {
       </section>
 
       <footer className="bg-rail text-rail-text">
-        <div className="mx-auto flex max-w-[1240px] items-center justify-between px-8 py-10 text-sm">
+        <div className="mx-auto flex max-w-[1240px] flex-col items-start justify-between gap-6 px-4 py-10 text-sm sm:px-8 md:flex-row md:items-center">
           <Wordmark dark />
-          <span className="text-right">Social media content for Indian small businesses · A Quantum Weave AI product
-            <span className="mt-2 block space-x-3"><a href="/privacy" className="underline hover:text-white">Privacy</a><a href="/terms" className="underline hover:text-white">Terms</a><a href="/refunds" className="underline hover:text-white">Cancellation and refunds</a><a href="/data-deletion" className="underline hover:text-white">Data deletion</a></span>
+          <span className="md:text-right">Social media content for Indian small businesses · A Quantum Weave AI product
+            <span className="mt-2 flex flex-wrap gap-x-3 gap-y-1 md:justify-end"><a href="/privacy" className="underline hover:text-white">Privacy</a><a href="/terms" className="underline hover:text-white">Terms</a><a href="/refunds" className="underline hover:text-white">Cancellation and refunds</a><a href="/data-deletion" className="underline hover:text-white">Data deletion</a></span>
           </span>
         </div>
       </footer>

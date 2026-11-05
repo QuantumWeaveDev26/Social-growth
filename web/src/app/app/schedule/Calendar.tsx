@@ -60,7 +60,9 @@ export function Calendar({ month, today, entries }: { month: string; today: stri
         </ul>
       </div>
 
-      <div className="mt-4 overflow-hidden rounded-[14px] bg-sheet ring-1 ring-line">
+      <p className="mt-4 text-xs text-ink-3 md:hidden">Swipe sideways to see the whole week, or switch to List.</p>
+      <div className="mt-2 overflow-x-auto rounded-[14px] bg-sheet ring-1 ring-line md:mt-4">
+        <div className="min-w-[720px]">
         <div className="grid grid-cols-7 border-b border-line bg-white text-xs font-semibold uppercase tracking-wide text-ink-3">
           {WEEKDAYS.map((d) => <div key={d} className="px-3 py-2">{d}</div>)}
         </div>
@@ -88,6 +90,7 @@ export function Calendar({ month, today, entries }: { month: string; today: stri
               </div>
             );
           })}
+        </div>
         </div>
       </div>
       <p className="mt-3 text-sm text-ink-3">

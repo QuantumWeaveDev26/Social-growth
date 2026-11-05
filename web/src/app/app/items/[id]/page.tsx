@@ -82,9 +82,9 @@ export default async function ItemPage({ params, searchParams }: { params: Promi
   );
 
   return (
-    <main className="px-12 pb-20 pt-8">
+    <main className="px-4 sm:px-8 lg:px-12 pb-20 pt-6 lg:pt-8">
       <AutoRefresh active={making || posting} />
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <Link href="/app" className="flex items-center gap-1.5 text-sm font-medium text-ink-2 hover:text-ink"><ArrowLeft className="size-4" aria-hidden />Proof sheet</Link>
         <div className="flex items-center gap-1 text-sm text-ink-2">
           <span className="tnum mr-2">{idx + 1} of {siblings.length}</span>
@@ -93,7 +93,7 @@ export default async function ItemPage({ params, searchParams }: { params: Promi
         </div>
       </div>
 
-      <div className="mt-6 grid grid-cols-[minmax(0,460px)_minmax(0,1fr)] gap-12">
+      <div className="mt-6 grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,460px)_minmax(0,1fr)] xl:gap-12">
         <PreviewTabs ig={ig} fb={fb} />
 
         <section className="min-w-0">
@@ -144,7 +144,7 @@ export default async function ItemPage({ params, searchParams }: { params: Promi
           )}
 
           {(item.status === "scheduled" || item.status === "approved") && !posting && (
-            <div className="mt-8 flex items-center justify-between gap-6 rounded-[14px] bg-mint-wash/70 p-6">
+            <div className="mt-8 flex flex-wrap items-center justify-between gap-4 rounded-[14px] bg-mint-wash/70 p-5 sm:p-6">
               <div className="flex items-center gap-4">
                 <ApproveMark draw={sp.approved === id} className="w-12" />
                 <div>
@@ -213,7 +213,7 @@ export default async function ItemPage({ params, searchParams }: { params: Promi
 
 function Row({ k, children }: { k: string; children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[150px_1fr] gap-6 py-3.5">
+    <div className="grid grid-cols-1 gap-1 sm:grid-cols-[150px_minmax(0,1fr)] sm:gap-6 py-3.5">
       <dt className="font-semibold text-ink-2">{k}</dt>
       <dd className="leading-relaxed">{children}</dd>
     </div>

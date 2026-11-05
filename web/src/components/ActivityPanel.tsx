@@ -99,7 +99,7 @@ export function ActivityPanel({ initial, admin = false, itemHref = (id: string) 
           <span className="font-semibold">New content is on hold.</span> Items waiting in line will be made when generation resumes. Approved posts still go out on schedule.
         </p>
       )}
-      <div className="mt-8 grid grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] gap-10">
+      <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-10">
         <div className="min-w-0 space-y-9">
           <section aria-labelledby="now-h">
             <h2 id="now-h" className="flex items-baseline gap-2 text-[1.05rem] font-bold">Working on now <span className="tnum text-sm font-medium text-ink-3">{a.running.length}</span></h2>

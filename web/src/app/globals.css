@@ -36,14 +36,18 @@
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-html { color-scheme: light; }
+html { color-scheme: light; -webkit-text-size-adjust: 100%; }
 body {
   background: var(--color-paper);
   color: var(--color-ink);
   font-family: var(--font-sans);
   font-feature-settings: "ss01";
   -webkit-font-smoothing: antialiased;
+  overflow-wrap: break-word;
 }
+img, video { max-width: 100%; }
+/* phones: keep form fields at 16px so iOS doesn't zoom in on tap */
+@media (max-width: 639px) { input, select, textarea { font-size: 16px; } }
 
 ::selection { background: color-mix(in oklab, var(--color-mint) 28%, white); color: var(--color-ink); }
 input, textarea { caret-color: var(--color-mint-deep); }

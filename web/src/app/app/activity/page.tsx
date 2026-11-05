@@ -8,9 +8,9 @@ export const dynamic = "force-dynamic";
 export default async function ActivityPage() {
   const { customer } = await requireCustomer();
   return (
-    <main className="px-12 pb-20 pt-10">
+    <main className="px-4 sm:px-8 lg:px-12 pb-20 pt-6 lg:pt-10">
       <header className="border-b border-line pb-6">
-        <h1 className="font-display text-[2.3rem] leading-none tracking-[-0.03em]" style={{ fontWeight: 800 }}>Activity</h1>
+        <h1 className="font-display text-[1.85rem] sm:text-[2.3rem] leading-none tracking-[-0.03em]" style={{ fontWeight: 800 }}>Activity</h1>
         <p className="mt-3 text-ink-2">What’s being made for {customer.businessName} right now, what’s next, and what just finished. Updates live.</p>
       </header>
       <div className="mt-8"><ActivityPanel initial={getActivity(customer.id)} /></div>

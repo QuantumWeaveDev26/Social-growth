@@ -9,7 +9,7 @@ export function SignInForm() {
   const [state, action] = useActionState(signIn, undefined);
   return (
     <form action={action} className="space-y-5">
-      <h1 className="font-display text-[2.2rem] leading-tight tracking-[-0.03em]" style={{ fontWeight: 800 }}>Welcome back</h1>
+      <h1 className="font-display text-[1.9rem] leading-tight sm:text-[2.2rem] tracking-[-0.03em]" style={{ fontWeight: 800 }}>Welcome back</h1>
       <p className="text-ink-2">Sign in to review this month’s proof sheet.</p>
       <FormError message={state?.error} />
       <div><label className="label" htmlFor="email">Email</label><input id="email" name="email" type="email" autoComplete="email" required className="field" /></div>
@@ -31,7 +31,7 @@ export function SignUpForm({ plan }: { plan?: string }) {
       <p className="text-ink-2">Takes about five minutes. You’ll see your brand profile before anything is made.</p>
       <FormError message={state?.error} />
       {plan && <input type="hidden" name="plan" value={plan} />}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div><label className="label" htmlFor="name">Your name</label><input id="name" name="name" autoComplete="name" required className="field" /></div>
         <div><label className="label" htmlFor="business">Business name</label><input id="business" name="business" autoComplete="organization" required className="field" /></div>
       </div>

@@ -16,8 +16,8 @@ export default async function FailedJobs() {
   const names = new Map(db.select({ id: schema.customers.id, name: schema.customers.businessName }).from(schema.customers).all().map((c) => [c.id, c.name]));
   return (
     <AdminShell active="jobs" email={admin.email} badges={{ jobs: jobs.length }}>
-      <div className="overflow-hidden rounded-[12px] bg-sheet ring-1 ring-line">
-        <table className="tnum w-full text-left text-[0.88rem]">
+      <div className="overflow-x-auto rounded-[12px] bg-sheet ring-1 ring-line">
+        <table className="tnum w-full min-w-[760px] text-left text-[0.88rem]">
           <thead className="border-b border-line text-xs uppercase tracking-wide text-ink-3"><tr>{["Job", "Client", "Tries", "Created", "Error", ""].map((h) => <th key={h} className="px-4 py-2.5 font-semibold">{h}</th>)}</tr></thead>
           <tbody className="divide-y divide-line">
             {!jobs.length && <tr><td colSpan={6} className="px-4 py-8 text-center text-ink-2">No failed jobs.</td></tr>}

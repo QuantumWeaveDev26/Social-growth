@@ -30,14 +30,14 @@ export default async function Billing({ searchParams }: { searchParams: Promise<
     : sub.rzpStatus === "halted" ? "Auto-pay stopped after failed charges. Set it up again to continue."
     : "Auto-pay isn’t set up.";
   return (
-    <main className="px-12 pb-20 pt-10">
+    <main className="px-4 sm:px-8 lg:px-12 pb-20 pt-6 lg:pt-10">
       <header className="border-b border-line pb-6">
-        <h1 className="font-display text-[2.3rem] leading-none tracking-[-0.03em]" style={{ fontWeight: 800 }}>Billing</h1>
+        <h1 className="font-display text-[1.85rem] sm:text-[2.3rem] leading-none tracking-[-0.03em]" style={{ fontWeight: 800 }}>Billing</h1>
         <p className="mt-3 text-ink-2">Plans renew every month by auto-pay (UPI Autopay or card). Each month includes {remakes.free} free remakes; extra remakes are ₹199 a post and ₹399 a reel.</p>
       </header>
       {sp.autopay && <p role="status" className="mt-6 rounded-[12px] bg-mint-wash px-4 py-3 text-mint-deep">Auto-pay is set up. You’ll get a receipt from Razorpay each month.</p>}
       {sp.renewed && <p role="status" className="mt-6 rounded-[12px] bg-mint-wash px-4 py-3 text-mint-deep">Renewed. Thank you. Next month will be planned automatically about 10 days before the month ends.</p>}
-      <div className="mt-8 grid max-w-[1000px] grid-cols-[1fr_380px] gap-12">
+      <div className="mt-8 grid max-w-[1000px] grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-12">
         <section>
           <div className={`rounded-[14px] p-6 ${lapsed ? "bg-amber-wash" : "bg-sheet ring-1 ring-line"}`}>
             <p className="text-sm text-ink-2">Current plan</p>
@@ -49,7 +49,7 @@ export default async function Billing({ searchParams }: { searchParams: Promise<
             <p className="tnum mt-3 text-sm text-ink-2">Free remakes this month: <span className="font-semibold text-ink">{remakes.left} of {remakes.free} left</span> · resets {day(remakes.resetsOn)}</p>
           </div>
           <h2 className="mt-10 font-bold">Payment history</h2>
-          <table className="tnum mt-3 w-full text-left text-[0.9rem]">
+          <div className="mt-3 overflow-x-auto"><table className="tnum w-full min-w-[520px] text-left text-[0.9rem]">
             <thead className="border-b border-line text-ink-2"><tr><th className="py-2 font-semibold">Date</th><th className="font-semibold">Plan</th><th className="font-semibold">Period</th><th className="font-semibold">Amount</th><th className="font-semibold">Reference</th></tr></thead>
             <tbody className="divide-y divide-line">
               {history.map((h) => (
@@ -57,7 +57,7 @@ export default async function Billing({ searchParams }: { searchParams: Promise<
               ))}
               {!history.length && <tr><td colSpan={5} className="py-6 text-center text-ink-2">No payments yet.</td></tr>}
             </tbody>
-          </table>
+          </table></div>
         </section>
         <aside>
           <div className="sticky top-8 space-y-6 rounded-[14px] bg-sheet p-6 ring-1 ring-line">

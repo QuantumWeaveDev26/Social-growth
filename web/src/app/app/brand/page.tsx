@@ -15,13 +15,13 @@ export default async function Brand() {
   const busy = !!db.select().from(schema.jobs).where(and(eq(schema.jobs.customerId, customer.id), eq(schema.jobs.type, "brand_profile"), inArray(schema.jobs.status, ["queued", "running"]))).get();
   const pillars = profile ? (JSON.parse(profile.pillars) as Array<{ name: string; why: string; share?: number }>) : [];
   return (
-    <main className="px-12 pb-20 pt-10">
+    <main className="px-4 sm:px-8 lg:px-12 pb-20 pt-6 lg:pt-10">
       <AutoRefresh active={busy} />
       <header className="border-b border-line pb-6">
-        <h1 className="font-display text-[2.3rem] leading-none tracking-[-0.03em]" style={{ fontWeight: 800 }}>Brand profile</h1>
+        <h1 className="font-display text-[1.85rem] sm:text-[2.3rem] leading-none tracking-[-0.03em]" style={{ fontWeight: 800 }}>Brand profile</h1>
         <p className="tnum mt-3 text-ink-2">{profile ? `Version ${profile.version} · written ${fmtDateTime(profile.createdAt)}` : "Not written yet"}{busy ? " · rewriting now" : ""}</p>
       </header>
-      <div className="mt-8 grid grid-cols-[minmax(0,1fr)_340px] gap-14">
+      <div className="mt-8 grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-14">
         <article className="min-w-0 max-w-[72ch]">
           {profile ? (
             <>
@@ -29,9 +29,9 @@ export default async function Brand() {
               <h2 className="mt-10 text-[1.02rem] font-bold">Content themes</h2>
               <ul className="mt-2 divide-y divide-line border-y border-line">
                 {pillars.map((p) => (
-                  <li key={p.name} className="flex gap-6 py-3">
-                    <span className="w-44 shrink-0 font-semibold">{p.name}</span>
-                    <span className="flex-1 text-[0.93rem] text-ink-2">{p.why}</span>
+                  <li key={p.name} className="flex flex-wrap gap-x-6 gap-y-1 py-3 sm:flex-nowrap">
+                    <span className="min-w-0 flex-1 font-semibold sm:w-44 sm:flex-none sm:shrink-0">{p.name}</span>
+                    <span className="order-last w-full text-[0.93rem] text-ink-2 sm:order-none sm:w-auto sm:flex-1">{p.why}</span>
                     {p.share != null && <span className="tnum text-sm font-semibold text-ink-3">{Math.round(p.share <= 1 ? p.share * 100 : p.share)}%</span>}
                   </li>
                 ))}

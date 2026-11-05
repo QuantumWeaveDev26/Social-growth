@@ -36,32 +36,32 @@ export default async function Onboarding({ searchParams }: { searchParams: Promi
   const onHold = profileBusy && generationHeldFor(customer.id);
 
   return (
-    <div className="grid min-h-dvh grid-cols-[300px_1fr]">
-      <aside className="flex flex-col bg-rail px-7 py-8 text-rail-text">
+    <div className="min-h-dvh lg:grid lg:grid-cols-[300px_minmax(0,1fr)]">
+      <aside className="flex flex-col bg-rail px-4 py-4 text-rail-text sm:px-8 lg:px-7 lg:py-8">
         <Wordmark dark />
-        <p className="mt-10 text-sm">Setting up <span className="font-semibold text-white">{customer.businessName}</span></p>
-        <ol className="mt-6 space-y-1">
+        <p className="mt-4 text-sm lg:mt-10">Setting up <span className="font-semibold text-white">{customer.businessName}</span></p>
+        <ol className="-mx-4 mt-3 flex gap-1 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:px-0 lg:mt-6 lg:block lg:space-y-1">
           {STEPS.map((s, i) => {
             const n = i + 1;
             const done = n < reached;
             const current = n === step;
             const inner = (
-              <span className={`flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-[0.93rem] ${current ? "bg-rail-2 font-semibold text-white" : ""}`}>
+              <span className={`flex items-center gap-3 whitespace-nowrap rounded-[10px] px-3 py-2 text-[0.88rem] lg:py-2.5 lg:text-[0.93rem] ${current ? "bg-rail-2 font-semibold text-white" : ""}`}>
                 <span className={`grid size-6 place-items-center rounded-full text-xs font-bold tnum ${done ? "bg-mint text-white" : current ? "bg-white text-ink" : "ring-1 ring-rail-text/40"}`}>
                   {done ? <Check className="size-3.5" aria-hidden /> : n}
                 </span>
                 {s}
               </span>
             );
-            return <li key={s}>{n <= reached ? <Link href={`/onboarding?step=${n}`} className="block hover:text-white">{inner}</Link> : <span className="block opacity-60">{inner}</span>}</li>;
+            return <li key={s} className="shrink-0">{n <= reached ? <Link href={`/onboarding?step=${n}`} className="block hover:text-white">{inner}</Link> : <span className="block opacity-60">{inner}</span>}</li>;
           })}
         </ol>
-        <form action={signOut} className="mt-auto">
-          <button className="text-sm text-rail-text underline hover:text-white">Sign out ({user.email})</button>
+        <form action={signOut} className="mt-3 lg:mt-auto">
+          <button className="text-sm text-rail-text underline hover:text-white">Sign out<span className="hidden lg:inline"> ({user.email})</span></button>
         </form>
       </aside>
 
-      <main className="px-16 py-14">
+      <main className="px-4 py-8 sm:px-8 lg:px-16 lg:py-14">
         <div className="max-w-[760px]">
           {step === 1 && <PlanStep plans={plans} current={sub?.status === "active" ? sub.planId : sp.plan} live={razorpayLive()} paid={sub?.status === "active"} />}
           {step === 2 && <BusinessStep name={customer.businessName} website={customer.websiteUrl ?? ""} d={details} />}

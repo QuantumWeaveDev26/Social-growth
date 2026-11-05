@@ -31,12 +31,12 @@ export function MetaConnect({ conn, message, after, disconnect, check }: {
 
       {conn ? (
         <div className={`rounded-[14px] p-6 ${broken ? "bg-red-wash" : "bg-sheet ring-1 ring-line"}`}>
-          <div className="flex items-start justify-between gap-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="flex gap-3">
               {broken ? <AlertTriangle className="mt-0.5 size-5 shrink-0 text-red" aria-hidden /> : <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-mint-deep" aria-hidden />}
               <div>
                 <p className="font-semibold">{broken ? "Connection needs renewing" : `Connected${conn.mode === "demo" ? " (demo)" : ""}`}</p>
-                <dl className="mt-2 grid grid-cols-[110px_1fr] gap-y-1 text-sm">
+                <dl className="mt-2 grid grid-cols-[110px_minmax(0,1fr)] gap-y-1 text-sm">
                   {conn.kind === "facebook" && <><dt className="text-ink-3">Facebook Page</dt><dd>{conn.pageName}</dd></>}
                   <dt className="text-ink-3">Instagram</dt><dd>{conn.igUsername ? `@${conn.igUsername}` : <span className="text-amber-deep">Not linked, Facebook only</span>}</dd>
                   <dt className="text-ink-3">Posts go to</dt><dd>{conn.kind === "instagram" ? "Instagram" : conn.igUserId ? "Facebook and Instagram" : "Facebook"}</dd>

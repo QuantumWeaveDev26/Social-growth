@@ -87,15 +87,15 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
   for (const it of upcoming) days.set(istDayKey(it.slotAt), [...(days.get(istDayKey(it.slotAt)) || []), it]);
 
   return (
-    <main className="px-12 pb-20 pt-10">
-      <header className="flex items-end justify-between gap-8 border-b border-line pb-6">
+    <main className="px-4 sm:px-8 lg:px-12 pb-20 pt-6 lg:pt-10">
+      <header className="flex flex-wrap items-end justify-between gap-4 border-b lg:gap-8 border-line pb-6">
         <div>
-          <h1 className="font-display text-[2.3rem] leading-none tracking-[-0.03em]" style={{ fontWeight: 800 }}>Schedule</h1>
+          <h1 className="font-display text-[1.85rem] sm:text-[2.3rem] leading-none tracking-[-0.03em]" style={{ fontWeight: 800 }}>Schedule</h1>
           <p className="mt-3 max-w-[70ch] text-ink-2">
             Everything you’ve approved, by day. Facebook image posts also appear in your Meta Business Suite under <span className="font-semibold text-ink">Scheduled</span>. Instagram doesn’t let outside apps add to its schedule, so BrandMint posts those at the time shown.
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
         <nav className="flex rounded-[10px] bg-sheet p-1 ring-1 ring-line" aria-label="View">
           <Link href={`/app/schedule${sp.month ? `?month=${sp.month}` : ""}`} aria-current={view === "calendar" ? "page" : undefined} className={`flex items-center gap-1.5 rounded-[8px] px-3 py-1.5 text-sm font-medium ${view === "calendar" ? "bg-ink text-white" : "text-ink-2 hover:text-ink"}`}><CalendarDays className="size-4" aria-hidden />Calendar</Link>
           <Link href="/app/schedule?view=list" aria-current={view === "list" ? "page" : undefined} className={`flex items-center gap-1.5 rounded-[8px] px-3 py-1.5 text-sm font-medium ${view === "list" ? "bg-ink text-white" : "text-ink-2 hover:text-ink"}`}><List className="size-4" aria-hidden />List</Link>

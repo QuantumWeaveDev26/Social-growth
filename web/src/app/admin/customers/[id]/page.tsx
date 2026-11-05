@@ -46,7 +46,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
 
 
         <Link href="/admin/customers" className="flex items-center gap-1.5 text-sm font-medium text-ink-2 hover:text-ink"><ArrowLeft className="size-4" aria-hidden />All clients</Link>
-        <div className="mt-4 flex items-end justify-between gap-6 border-b border-line pb-6">
+        <div className="mt-4 flex flex-wrap items-end justify-between gap-4 border-b border-line pb-6">
           <div>
             <h1 className="font-display text-[2.2rem] leading-none tracking-[-0.03em]" style={{ fontWeight: 800 }}>{c.businessName}</h1>
             <p className="tnum mt-2 text-ink-2">{owner?.name} · {owner?.email} · joined {fmtDateTime(c.createdAt)} · <span className="capitalize">{c.status}</span> · AI spend {usd(totalCost)}</p>
@@ -72,7 +72,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
           </form>
         )}
 
-        <div className="mt-8 grid grid-cols-3 gap-8">
+        <div className="mt-8 grid grid-cols-1 gap-8 md:grid-cols-3">
           <section className="rounded-[14px] bg-sheet p-5 ring-1 ring-line">
             <h2 className="font-bold">Subscription</h2>
             <p className="tnum mt-2 text-sm text-ink-2">{plan ? `${plan.name} · ${inr(plan.priceInr)}` : "None"} · {sub?.status ?? "—"} · {sub?.provider}</p>
@@ -144,19 +144,19 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
           );
           return (
             <section className="mt-8 rounded-[14px] bg-sheet p-5 ring-1 ring-line">
-              <div className="flex items-center justify-between gap-4">
+              <div className="flex flex-wrap items-center justify-between gap-4">
                 <div><h2 className="font-bold">Writer comparison</h2><p className="text-sm text-ink-2">Same brief, OpenAI vs Gemini. {w?.brief ? `Brief: ${w.brief}` : ""}</p></div>
                 <form action={adminCompareWriters}><Hidden /><SubmitButton className="btn btn-ghost" pending="Queued" disabled={!!busy}>{busy ? "Writing…" : "Compare writers (~$0.05)"}</SubmitButton></form>
               </div>
               <AutoRefresh active={!!busy} />
               {w?.status === "failed" && <p className="mt-3 text-sm text-red">{w.error}</p>}
-              {w?.status === "done" && <div className="mt-4 grid grid-cols-2 gap-4"><Col name="OpenAI" r={w.openai} /><Col name="Gemini" r={w.gemini} /></div>}
+              {w?.status === "done" && <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2"><Col name="OpenAI" r={w.openai} /><Col name="Gemini" r={w.gemini} /></div>}
             </section>
           );
         })()}
 
         <h2 className="mt-10 text-lg font-bold">Months</h2>
-        <table className="tnum mt-3 w-full overflow-hidden rounded-[12px] bg-sheet text-left text-[0.88rem] ring-1 ring-line">
+        <div className="mt-3 overflow-x-auto rounded-[12px] ring-1 ring-line"><table className="tnum w-full min-w-[720px] bg-sheet text-left text-[0.88rem]">
           <thead className="border-b border-line text-ink-2"><tr>{["Month", "Status", "Items", "Awaiting", "Approved/posted", "Being made", "Failed", "AI cost"].map((h) => <th key={h} className="px-4 py-2.5 font-semibold">{h}</th>)}</tr></thead>
           <tbody className="divide-y divide-line">
             {months.map((m) => {
@@ -173,7 +173,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
             })}
             {!months.length && <tr><td colSpan={8} className="px-4 py-6 text-center text-ink-2">No months planned yet.</td></tr>}
           </tbody>
-        </table>
+        </table></div>
 
         {failed.length > 0 && (
           <>

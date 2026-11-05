@@ -2,14 +2,14 @@ import { Wordmark } from "@/components/ui";
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="grid min-h-dvh grid-cols-[1fr_1fr]">
-      <div className="flex flex-col px-14 py-10">
+    <div className="min-h-dvh lg:grid lg:grid-cols-[1fr_1fr]">
+      <div className="flex min-h-dvh flex-col px-5 py-6 sm:px-10 sm:py-8 lg:px-14 lg:py-10">
         <Wordmark />
-        <div className="flex flex-1 items-center">
-          <div className="w-full max-w-[400px]">{children}</div>
+        <div className="flex flex-1 items-center py-8">
+          <div className="mx-auto w-full max-w-[400px] lg:mx-0">{children}</div>
         </div>
       </div>
-      <div className="relative overflow-hidden bg-rail">
+      <div className="relative hidden overflow-hidden bg-rail lg:block">
         <div className="absolute inset-0 grid grid-cols-3 gap-3 p-10 opacity-90">
           {["bakery", "cafe", "boutique", "dental", "fitness", "realty", "cafe", "bakery", "boutique"].map((s, i) => (
             // eslint-disable-next-line @next/next/no-img-element

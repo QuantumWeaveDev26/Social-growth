@@ -14,10 +14,10 @@ export default async function Notifications() {
   const list = db.select().from(schema.notifications).where(eq(schema.notifications.customerId, customer.id)).orderBy(desc(schema.notifications.createdAt)).limit(100).all();
   const unread = list.filter((n) => !n.readAt).length;
   return (
-    <main className="px-12 pb-20 pt-10">
-      <header className="flex items-end justify-between gap-6 border-b border-line pb-6">
+    <main className="px-4 sm:px-8 lg:px-12 pb-20 pt-6 lg:pt-10">
+      <header className="flex flex-wrap items-end justify-between gap-4 border-b border-line pb-6">
         <div>
-          <h1 className="font-display text-[2.3rem] leading-none tracking-[-0.03em]" style={{ fontWeight: 800 }}>Notifications</h1>
+          <h1 className="font-display text-[1.85rem] sm:text-[2.3rem] leading-none tracking-[-0.03em]" style={{ fontWeight: 800 }}>Notifications</h1>
           <p className="tnum mt-3 text-ink-2">{unread ? `${unread} unread` : "You’re up to date"}</p>
         </div>
         {unread > 0 && <form action={markAllRead}><SubmitButton className="btn btn-ghost" pending="Marking">Mark all as read</SubmitButton></form>}

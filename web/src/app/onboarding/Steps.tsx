@@ -51,7 +51,7 @@ export function PlanStep({ plans, current, live, paid }: { plans: Plan[]; curren
       <p className="mt-3 text-ink-2">Billed monthly with auto-pay (UPI Autopay or card). Cancel or change plan any time from Billing. Prices include GST.</p>
       <div className="mt-8 divide-y divide-line overflow-hidden rounded-[14px] bg-sheet ring-1 ring-line" role="radiogroup" aria-label="Plan">
         {plans.map((p) => (
-          <label key={p.id} className={`flex cursor-pointer items-center gap-5 px-6 py-5 transition-colors ${selected === p.id ? "bg-mint-wash/60" : "hover:bg-white"}`}>
+          <label key={p.id} className={`flex cursor-pointer items-center gap-4 px-4 py-4 sm:gap-5 sm:px-6 sm:py-5 transition-colors ${selected === p.id ? "bg-mint-wash/60" : "hover:bg-white"}`}>
             <input type="radio" name="plan" value={p.id} checked={selected === p.id} onChange={() => setSelected(p.id)} className="size-4 accent-[#1F9D74]" />
             <span className="flex-1">
               <span className="block font-semibold">{p.name}</span>
@@ -96,7 +96,7 @@ export function BusinessStep({ name, website, d }: { name: string; website: stri
         <p className="mt-3 max-w-[60ch] text-ink-2">Write it the way you’d explain it to a new staff member. Plain words are best. We’ll turn it into a brand profile you can check next.</p>
       </div>
       <FormError message={state?.error} />
-      <div className="grid grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         <div><label className="label" htmlFor="businessName">Business name</label><input id="businessName" name="businessName" defaultValue={name} className="field" /></div>
         <div><label className="label" htmlFor="website">Website or Instagram link</label><input id="website" name="website" defaultValue={website} placeholder="yourbusiness.in" className="field" /><p className="hint">Optional. We read it to learn your products and wording.</p></div>
         <div>
@@ -116,13 +116,13 @@ export function BusinessStep({ name, website, d }: { name: string; website: stri
       <div className="rounded-[14px] bg-sheet p-5 ring-1 ring-line">
         <p className="font-semibold">How do customers reach you?</p>
         <p className="hint mt-1">We only ever use the routes you give here in posts, like “WhatsApp us” or “Visit us at…”. Fill at least one.</p>
-        <div className="mt-3 grid grid-cols-3 gap-4">
+        <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div><label className="label" htmlFor="whatsapp">WhatsApp number</label><input id="whatsapp" name="whatsapp" defaultValue={d.whatsapp} placeholder="+91 98xxx xxxxx" className="field" /></div>
           <div><label className="label" htmlFor="phone">Phone for calls</label><input id="phone" name="phone" defaultValue={d.phone} placeholder="Optional" className="field" /></div>
           <div><label className="label" htmlFor="address">Shop address or area</label><input id="address" name="address" defaultValue={d.address} placeholder="12th Main, Indiranagar" className="field" /></div>
         </div>
       </div>
-      <div className="grid grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
         <div>
           <label className="label" htmlFor="style">Content style</label>
           <select id="style" name="style" defaultValue={d.style || "lively"} className="field">
@@ -172,7 +172,7 @@ export function BrandKitStep({ logo, colours, times }: { logo: string | null; co
         <p className="mt-3 text-ink-2">We place your logo on every post and use your colours for text on images and reels.</p>
       </div>
       <FormError message={state?.error} />
-      <div className="grid grid-cols-[200px_1fr] gap-8 rounded-[14px] bg-sheet p-6 ring-1 ring-line">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-[200px_minmax(0,1fr)] md:gap-8 rounded-[14px] bg-sheet p-4 sm:p-6 ring-1 ring-line">
         <label className="group grid aspect-square cursor-pointer place-items-center overflow-hidden rounded-[12px] border border-dashed border-line-strong bg-white transition-colors hover:border-mint">
           {preview ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -187,7 +187,7 @@ export function BrandKitStep({ logo, colours, times }: { logo: string | null; co
             <p className="label">Logo</p>
             <p className="text-sm text-ink-2">A PNG with a transparent background works best. Up to 5 MB.</p>
           </div>
-          <div className="flex gap-6">
+          <div className="flex flex-wrap gap-6">
             {[["c1", "Main colour", c1, setC1], ["c2", "Second colour", c2, setC2]].map(([n, l, v, set]) => (
               <div key={n as string}>
                 <label className="label" htmlFor={n as string}>{l as string}</label>
@@ -203,7 +203,7 @@ export function BrandKitStep({ logo, colours, times }: { logo: string | null; co
       <div>
         <p className="label">Best times to post (IST)</p>
         <p className="mb-3 text-sm text-ink-2">We alternate between these. Most Indian audiences are active late morning and early evening.</p>
-        <div className="flex gap-4">
+        <div className="flex flex-wrap gap-4">
           <input type="time" name="t1" defaultValue={times[0] || "10:00"} className="field w-36 tnum" aria-label="First posting time" />
           <input type="time" name="t2" defaultValue={times[1] || "18:30"} className="field w-36 tnum" aria-label="Second posting time" />
         </div>

@@ -33,10 +33,10 @@ export default async function ChoosePage({ searchParams }: { searchParams: Promi
   const { pages } = JSON.parse(open(pending.payload)!) as { pages: FbPage[] };
   const sorted = [...pages].sort((a, b) => Number(!!b.igId) - Number(!!a.igId));
   return (
-    <div className="min-h-dvh px-10 py-8">
+    <div className="min-h-dvh px-4 py-6 sm:px-10 sm:py-8">
       <Wordmark />
-      <main className="mx-auto mt-14 max-w-[640px]">
-        <h1 className="font-display text-[2.3rem] leading-tight tracking-[-0.03em]" style={{ fontWeight: 800 }}>Which Page is {customer.businessName}?</h1>
+      <main className="mx-auto mt-8 max-w-[640px]">
+        <h1 className="font-display text-[1.85rem] sm:text-[2.3rem] leading-tight tracking-[-0.03em]" style={{ fontWeight: 800 }}>Which Page is {customer.businessName}?</h1>
         <p className="mt-3 text-ink-2">You manage {pages.length} Facebook Pages. Pick the one we should post to. Its linked Instagram account is connected with it.</p>
         <form action={choose} className="mt-8">
           <input type="hidden" name="p" value={pending.id} />
