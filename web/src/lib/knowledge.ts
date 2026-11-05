@@ -15,6 +15,7 @@ export const KB_SECTIONS = [
   { id: "captions", label: "Captions and CTAs", hint: "Caption structures, CTA library, languages. Posts and reels." },
   { id: "industries", label: "Industry playbooks", hint: "Per-industry pains, ideas, best CTA, never-say. Every step." },
   { id: "quality", label: "Quality check and compliance", hint: "Hard gates, 0–10 score, compliance. Editor step." },
+  { id: "linkedin", label: "LinkedIn playbook", hint: "Hooks, structures and formatting for LinkedIn posts. Built from Admin → Creator study. LinkedIn posts." },
 ] as const;
 export type KbId = (typeof KB_SECTIONS)[number]["id"];
 
@@ -25,6 +26,7 @@ const STAGE: Record<string, KbId[]> = {
   post: ["core", "hooks", "posts", "visuals", "captions", "industries"],
   reel: ["core", "hooks", "reels", "visuals", "captions", "industries"],
   editor: ["core", "captions", "quality", "industries"],
+  linkedin_post: ["core", "hooks", "linkedin", "captions", "industries"],
 };
 
 export const kbGet = (id: string) => db.select().from(schema.kv).where(eq(schema.kv.key, `kb:${id}`)).get()?.value || "";
