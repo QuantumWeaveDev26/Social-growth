@@ -128,6 +128,16 @@ export async function adminVeoTest(fd: FormData) {
   back(id);
 }
 
+/** Films the same 8-second clip with Veo 3.1 Fast and Veo 3.1 Lite to compare quality (about ₹110 in total at 1080p). */
+export async function adminVeoCompare(fd: FormData) {
+  await requireAdmin();
+  const id = String(fd.get("customerId"));
+  const value = JSON.stringify({ status: "queued", at: Date.now() });
+  db.insert(schema.kv).values({ key: `veo_compare:${id}`, value }).onConflictDoUpdate({ target: schema.kv.key, set: { value } }).run();
+  enqueue("veo_compare", { customerId: id }, { customerId: id });
+  back(id);
+}
+
 /** Writes one post with OpenAI and with Gemini for comparison (a few cents). */
 export async function adminCompareWriters(fd: FormData) {
   await requireAdmin();

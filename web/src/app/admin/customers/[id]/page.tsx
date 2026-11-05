@@ -10,8 +10,8 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { daysLeft } from "@/lib/billing";
 import { currentMonth, nextMonth, fmtDateTime, inr, monthLabel } from "@/lib/format";
 import { mediaUrl } from "@/lib/storage";
-import { adminChangePlan, adminExtend, adminSetStatus, adminRetryFailed, adminReleaseHeld, adminPlanMonth, adminRebuildProfile, adminAttachOwner, adminAllowGeneration, adminSetVeo, adminVeoTest, adminCompareWriters } from "./actions";
-import { veoConfigured, veoFor, veoTestResult } from "@/lib/veo";
+import { adminChangePlan, adminExtend, adminSetStatus, adminRetryFailed, adminReleaseHeld, adminPlanMonth, adminRebuildProfile, adminAttachOwner, adminAllowGeneration, adminSetVeo, adminVeoTest, adminVeoCompare, adminCompareWriters } from "./actions";
+import { veoCompareResult, veoConfigured, veoFor, veoTestResult } from "@/lib/veo";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { generationPaused, generationAllowList } from "@/lib/jobs";
 
@@ -115,7 +115,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                   <form action={adminSetVeo} className="mt-2"><Hidden /><input type="hidden" name="on" value={on ? "0" : "1"} />
                     <SubmitButton className="btn btn-ghost w-full" pending="Saving">{on ? "Reels use Veo: on (switch off)" : "Use Veo moving clips for reels"}</SubmitButton>
                   </form>
-                  <form action={adminVeoTest} className="mt-2"><Hidden /><SubmitButton className="btn btn-ghost w-full" pending="Queued" disabled={!!busy}>Film one test clip (~$0.64)</SubmitButton></form>
+                  <form action={adminVeoTest} className="mt-2"><Hidden /><SubmitButton className="btn btn-ghost w-full" pending="Queued" disabled={!!busy}>Film one test clip</SubmitButton></form>
                   {t && (
                     <div className="mt-2 text-sm text-ink-2">
                       <AutoRefresh active={!!busy} />
@@ -129,6 +129,41 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
             })()}
           </section>
         </div>
+
+        {veoConfigured() && (() => {
+          const c = veoCompareResult(id);
+          const busy = !!c && ["queued", "running"].includes(c.status);
+          const Side = ({ label, r }: { label: string; r?: { model: string; path?: string; costUsd?: number; seconds?: number; error?: string } }) => (
+            <div className="rounded-[12px] bg-white p-3 ring-1 ring-line">
+              <p className="font-semibold">{label}</p>
+              {!r ? <p className="mt-2 text-sm text-ink-3">{busy ? "Filming…" : "Not filmed yet"}</p>
+                : r.error ? <p className="mt-2 text-sm text-red">Failed: {r.error}</p>
+                : <>
+                    <video src={mediaUrl(r.path!)!} controls playsInline className="mx-auto mt-2 aspect-[9/16] max-h-[520px] w-full rounded-[10px] bg-black object-contain" />
+                    <p className="tnum mt-2 text-sm text-ink-2">{r.model} · ${r.costUsd?.toFixed(2)} (₹{Math.round((r.costUsd || 0) * 94.53)}) · took {r.seconds}s</p>
+                  </>}
+            </div>
+          );
+          return (
+            <section className="mt-10 rounded-[14px] bg-sheet p-5 ring-1 ring-line">
+              <AutoRefresh active={busy} ms={6000} />
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="font-bold">Veo Fast vs Veo Lite</h2>
+                  <p className="mt-1 text-sm text-ink-2">Same image, same motion directions, 8 seconds{c?.resolution ? ` at ${c.resolution}` : ""}. Compare quality before choosing the reel model.</p>
+                </div>
+                <form action={adminVeoCompare}><Hidden /><SubmitButton className="btn btn-primary" pending="Queued" disabled={busy}>{c ? "Film again" : "Film both"}</SubmitButton></form>
+              </div>
+              {c?.status === "failed" && <p className="mt-3 text-sm text-red">{c.error}</p>}
+              {c && c.status !== "failed" && (
+                <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <Side label="Veo 3.1 Fast" r={c.fast} />
+                  <Side label="Veo 3.1 Lite" r={c.lite} />
+                </div>
+              )}
+            </section>
+          );
+        })()}
 
         {(() => {
           const raw = db.select().from(schema.kv).where(eq(schema.kv.key, `writer_compare:${id}`)).get()?.value;

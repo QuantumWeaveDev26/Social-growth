@@ -15,7 +15,15 @@ const LOCATION = process.env.VEO_LOCATION || "us-central1";
 const CLIP_SECONDS = Number(process.env.VEO_CLIP_SECONDS || 8); // Veo allows 4, 6 or 8
 const RESOLUTION = process.env.VEO_RESOLUTION || "720p";
 /** List price per second (USD) for cost tracking: Fast video-only 720p = $0.08, 1080p = $0.10. */
-const PRICE_PER_SEC = Number(process.env.VEO_PRICE_PER_SEC || (VEO_MODEL.includes("lite") ? 0.03 : VEO_MODEL.includes("fast") ? (RESOLUTION === "1080p" ? 0.1 : 0.08) : 0.2));
+/** Vertex list price per second of video without audio (cloud.google.com/vertex-ai/generative-ai/pricing, Nov 2026). */
+export function veoPricePerSec(model: string, res = RESOLUTION) {
+  const hd = res === "1080p";
+  if (model.includes("lite")) return hd ? 0.05 : 0.03;
+  if (model.includes("fast")) return hd ? 0.1 : 0.08;
+  return 0.2;
+}
+const PRICE_PER_SEC = Number(process.env.VEO_PRICE_PER_SEC || veoPricePerSec(VEO_MODEL));
+export const VEO_LITE_MODEL = process.env.VEO_LITE_MODEL || "veo-3.1-lite-generate-001";
 
 function sa(): SA | null {
   const b64 = process.env.GOOGLE_SA_JSON_B64;
@@ -56,9 +64,9 @@ async function accessToken() {
   return cached.token;
 }
 
-const base = () => {
+const base = (model = VEO_MODEL) => {
   const k = sa()!;
-  return `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${k.project_id}/locations/${LOCATION}/publishers/google/models/${VEO_MODEL}`;
+  return `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${k.project_id}/locations/${LOCATION}/publishers/google/models/${model}`;
 };
 
 async function call<T>(url: string, body: unknown): Promise<T> {
@@ -97,13 +105,14 @@ export async function imagenImage(prompt: string, aspect: "1:1" | "3:4" | "4:3" 
  * Turns one still image into a vertical clip. Returns the MP4 bytes and its list-price cost.
  * Waits for Google's long-running operation (usually 1–3 minutes).
  */
-export async function imageToVideo(imagePath: string, prompt: string, o: { seconds?: number; onWait?: (s: number) => void } = {}) {
+export async function imageToVideo(imagePath: string, prompt: string, o: { seconds?: number; onWait?: (s: number) => void; model?: string } = {}) {
+  const model = o.model || VEO_MODEL;
   const seconds = [4, 6, 8].includes(o.seconds ?? CLIP_SECONDS) ? (o.seconds ?? CLIP_SECONDS) : 8;
   // crop to an exact 9:16 frame first, so Veo fills the screen instead of adding black bars
   const sharp = (await import("sharp")).default;
   const img = (await sharp(fs.readFileSync(imagePath)).resize(1080, 1920, { fit: "cover", position: "attention" }).jpeg({ quality: 92 }).toBuffer()).toString("base64");
   const mimeType = "image/jpeg";
-  const op = await call<{ name: string }>(`${base()}:predictLongRunning`, {
+  const op = await call<{ name: string }>(`${base(model)}:predictLongRunning`, {
     instances: [{ prompt, image: { bytesBase64Encoded: img, mimeType } }],
     parameters: { aspectRatio: "9:16", durationSeconds: seconds, resolution: RESOLUTION, generateAudio: false, sampleCount: 1, personGeneration: "allow_adult", enhancePrompt: true },
   });
@@ -111,7 +120,7 @@ export async function imageToVideo(imagePath: string, prompt: string, o: { secon
   for (;;) {
     await new Promise((r) => setTimeout(r, 10_000));
     const st = await call<{ done?: boolean; error?: { message?: string }; response?: { videos?: Array<{ bytesBase64Encoded?: string; gcsUri?: string }>; raiMediaFilteredReasons?: string[]; raiMediaFilteredCount?: number } }>(
-      `${base()}:fetchPredictOperation`, { operationName: op.name },
+      `${base(model)}:fetchPredictOperation`, { operationName: op.name },
     );
     o.onWait?.(Math.round((Date.now() - started) / 1000));
     if (st.error) throw new Error(`Veo failed: ${st.error.message}`);
@@ -121,7 +130,7 @@ export async function imageToVideo(imagePath: string, prompt: string, o: { secon
         const why = st.response?.raiMediaFilteredReasons?.join("; ");
         throw new Error(why ? `Veo blocked the clip: ${why}` : `Veo returned no video${v?.gcsUri ? " (only a storage link)" : ""}`);
       }
-      return { mp4: Buffer.from(v.bytesBase64Encoded, "base64"), seconds, costUsd: seconds * PRICE_PER_SEC };
+      return { mp4: Buffer.from(v.bytesBase64Encoded, "base64"), seconds, costUsd: seconds * (o.model ? Number(process.env.VEO_PRICE_PER_SEC || veoPricePerSec(model)) : PRICE_PER_SEC) };
     }
     if (Date.now() - started > 10 * 60_000) throw new Error("Veo took longer than 10 minutes");
   }
@@ -165,6 +174,44 @@ export async function runVeoTest(customerId: string) {
   } catch (e) {
     set({ status: "failed", error: String(e instanceof Error ? e.message : e).slice(0, 400), source: item.thumbPath });
   }
+}
+
+/** Admin test: the same image and motion directions filmed by Veo 3.1 Fast and Veo 3.1 Lite, side by side. */
+export async function runVeoCompare(customerId: string) {
+  const { saveFile, absPath } = await import("./storage");
+  const { desc, and, isNotNull } = await import("drizzle-orm");
+  const key = `veo_compare:${customerId}`;
+  let state: Record<string, unknown> = {};
+  const set = (v: Record<string, unknown>) => {
+    state = { ...state, ...v, at: Date.now() };
+    const value = JSON.stringify(state);
+    db.insert(schema.kv).values({ key, value }).onConflictDoUpdate({ target: schema.kv.key, set: { value } }).run();
+  };
+  const item = db.select().from(schema.contentItems)
+    .where(and(eq(schema.contentItems.customerId, customerId), isNotNull(schema.contentItems.thumbPath)))
+    .orderBy(desc(schema.contentItems.updatedAt)).get();
+  if (!item?.thumbPath) { set({ status: "failed", error: "This client has no images yet to film." }); return; }
+  set({ status: "running", source: item.thumbPath, resolution: RESOLUTION });
+  const brief = JSON.parse(item.brief || "{}");
+  const prompt = motionPrompt(String(brief.topic || brief.title || "the scene in the photo"));
+  const one = async (label: "fast" | "lite", model: string) => {
+    const t0 = Date.now();
+    try {
+      const v = await imageToVideo(absPath(item.thumbPath!), prompt, { model });
+      const path = saveFile(`${customerId}/veo-test/compare-${label}-${Date.now()}.mp4`, v.mp4);
+      set({ [label]: { model, path, costUsd: v.costUsd, seconds: Math.round((Date.now() - t0) / 1000) } });
+    } catch (e) {
+      set({ [label]: { model, error: String(e instanceof Error ? e.message : e).slice(0, 300) } });
+    }
+  };
+  await Promise.all([one("fast", VEO_MODEL.includes("lite") ? "veo-3.1-fast-generate-001" : VEO_MODEL), one("lite", VEO_LITE_MODEL)]);
+  set({ status: "done" });
+}
+
+type CompareSide = { model: string; path?: string; costUsd?: number; seconds?: number; error?: string };
+export function veoCompareResult(customerId: string) {
+  const v = db.select().from(schema.kv).where(eq(schema.kv.key, `veo_compare:${customerId}`)).get()?.value;
+  return v ? (JSON.parse(v) as { status: string; error?: string; resolution?: string; fast?: CompareSide; lite?: CompareSide; at: number }) : null;
 }
 
 export function veoTestResult(customerId: string) {
