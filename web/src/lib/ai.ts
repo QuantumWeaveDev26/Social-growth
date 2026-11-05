@@ -72,15 +72,31 @@ async function openaiJson<T>(system: string, user: string, opts: { model?: strin
   return { data, costUsd };
 }
 
-export async function generateImage(prompt: string, size: "1024x1024" | "1024x1536" | "1536x1024" = "1024x1024"): Promise<{ png: Buffer; costUsd: number }> {
+export type ImageSize = "1024x1024" | "1024x1536" | "1536x1024" | "4:5";
+
+/**
+ * One image. "4:5" is the ad/feed format (1080×1350): neither model offers 4:5 directly, so we make a
+ * taller image (Imagen 3:4 at 2K, or OpenAI 1024×1536) and crop it to exactly 1080×1350.
+ */
+export async function generateImage(prompt: string, size: ImageSize = "1024x1024"): Promise<{ png: Buffer; costUsd: number }> {
+  const raw = await rawImage(prompt, size);
+  if (size !== "4:5") return raw;
+  const sharp = (await import("sharp")).default;
+  const png = await sharp(raw.png).resize(1080, 1350, { fit: "cover", position: "centre" }).png().toBuffer();
+  return { png, costUsd: raw.costUsd };
+}
+
+async function rawImage(prompt: string, size: ImageSize): Promise<{ png: Buffer; costUsd: number }> {
   // Google Imagen (billed to Google Cloud credit) whenever it's configured; OpenAI only if IMAGE_ENGINE=openai
   const { veoConfigured, imagenImage } = await import("./veo");
   if (process.env.IMAGE_ENGINE !== "openai" && veoConfigured()) {
-    return imagenImage(prompt, size === "1024x1536" ? "9:16" : size === "1536x1024" ? "16:9" : "1:1");
+    return imagenImage(prompt, size === "4:5" ? "3:4" : size === "1024x1536" ? "9:16" : size === "1536x1024" ? "16:9" : "1:1");
   }
-  const r = await gateway<{ b64: string | null; error: unknown }>({ type: "image", prompt, size, model: process.env.AI_IMAGE_MODEL || "gpt-image-1.5", quality: "high" });
+  const oaSize = size === "4:5" ? "1024x1536" : size;
+  const r = await gateway<{ b64: string | null; error: unknown }>({ type: "image", prompt, size: oaSize, model: process.env.AI_IMAGE_MODEL || "gpt-image-1.5", quality: "high" });
   if (!r.b64) throw new Error("Image generation failed: " + JSON.stringify(r.error).slice(0, 300));
-  return { png: Buffer.from(r.b64, "base64"), costUsd: size === "1024x1024" ? 0.13 : 0.2 };
+  // gpt-image-1.5 high quality list prices: $0.133 square, $0.200 tall/wide
+  return { png: Buffer.from(r.b64, "base64"), costUsd: oaSize === "1024x1024" ? 0.133 : 0.2 };
 }
 
 export type Alignment = { characters: string[]; character_start_times_seconds: number[]; character_end_times_seconds: number[] };

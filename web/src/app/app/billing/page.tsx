@@ -33,7 +33,7 @@ export default async function Billing({ searchParams }: { searchParams: Promise<
     <main className="px-4 sm:px-8 lg:px-12 pb-20 pt-6 lg:pt-10">
       <header className="border-b border-line pb-6">
         <h1 className="font-display text-[1.85rem] sm:text-[2.3rem] leading-none tracking-[-0.03em]" style={{ fontWeight: 800 }}>Billing</h1>
-        <p className="mt-3 text-ink-2">Plans renew every month by auto-pay (UPI Autopay or card). Each month includes {remakes.free} free remakes; extra remakes are ₹199 a post and ₹399 a reel.</p>
+        <p className="mt-3 text-ink-2">Plans renew every month by auto-pay (UPI Autopay or card). Each month includes {remakes.free} revision round{remakes.free === 1 ? "" : "s"}; after that, a change is ₹199 an image or ₹399 a video. Prices include GST. Your Meta ad budget is paid by you directly to Meta.</p>
       </header>
       {sp.autopay && <p role="status" className="mt-6 rounded-[12px] bg-mint-wash px-4 py-3 text-mint-deep">Auto-pay is set up. You’ll get a receipt from Razorpay each month.</p>}
       {sp.renewed && <p role="status" className="mt-6 rounded-[12px] bg-mint-wash px-4 py-3 text-mint-deep">Renewed. Thank you. Next month will be planned automatically about 10 days before the month ends.</p>}
@@ -46,14 +46,14 @@ export default async function Billing({ searchParams }: { searchParams: Promise<
               {!sub ? "Not started" : lapsed ? `Ended ${day(sub.periodEnd)}. New content is paused until you renew; approved posts still go out.` : `Active until ${day(sub.periodEnd)} · ${left} day${left === 1 ? "" : "s"} left`}
             </p>
             <p className="mt-1 text-sm text-ink-3">{payLine}</p>
-            <p className="tnum mt-3 text-sm text-ink-2">Free remakes this month: <span className="font-semibold text-ink">{remakes.left} of {remakes.free} left</span> · resets {day(remakes.resetsOn)}</p>
+            <p className="tnum mt-3 text-sm text-ink-2">Revision rounds this month: <span className="font-semibold text-ink">{remakes.left} of {remakes.free} left</span> · resets {day(remakes.resetsOn)}</p>
           </div>
           <h2 className="mt-10 font-bold">Payment history</h2>
           <div className="mt-3 overflow-x-auto"><table className="tnum w-full min-w-[520px] text-left text-[0.9rem]">
             <thead className="border-b border-line text-ink-2"><tr><th className="py-2 font-semibold">Date</th><th className="font-semibold">Plan</th><th className="font-semibold">Period</th><th className="font-semibold">Amount</th><th className="font-semibold">Reference</th></tr></thead>
             <tbody className="divide-y divide-line">
               {history.map((h) => (
-                <tr key={h.id}><td className="py-2.5">{day(h.createdAt)}</td><td>{h.kind === "remake" ? "Extra remake" : plans.find((p) => p.id === h.planId)?.name}</td><td>{h.kind === "remake" ? "—" : `${day(h.periodStart)} – ${day(h.periodEnd)}`}</td><td>{h.amountInr ? inr(h.amountInr) : h.provider === "admin" ? "Added by BrandMint" : "Demo"}</td><td className="font-mono text-xs text-ink-3">{h.paymentId ?? "—"}</td></tr>
+                <tr key={h.id}><td className="py-2.5">{day(h.createdAt)}</td><td>{h.kind === "remake" ? "Extra change" : plans.find((p) => p.id === h.planId)?.name}</td><td>{h.kind === "remake" ? "—" : `${day(h.periodStart)} – ${day(h.periodEnd)}`}</td><td>{h.amountInr ? inr(h.amountInr) : h.provider === "admin" ? "Added by BrandMint" : "Demo"}</td><td className="font-mono text-xs text-ink-3">{h.paymentId ?? "—"}</td></tr>
               ))}
               {!history.length && <tr><td colSpan={5} className="py-6 text-center text-ink-2">No payments yet.</td></tr>}
             </tbody>

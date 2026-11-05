@@ -5,7 +5,7 @@ import { and, eq, inArray, isNull, lt } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireCustomer, checkPassword, hashPassword, createSession } from "@/lib/auth";
 import { enqueue } from "@/lib/jobs";
-import { remakeAllowance, remakePrice, startRemake, fulfilPaidRemake } from "@/lib/remakes";
+import { remakeAllowance, remakePrice, startRemake, fulfilPaidRemake, setPendingNote, submitRound } from "@/lib/remakes";
 import { createOrder, razorpayLive, verifySignature } from "@/lib/razorpay";
 import { currentMonth, nextMonth } from "@/lib/format";
 
@@ -23,7 +23,7 @@ export async function approveItem(fd: FormData) {
   const itemId = String(fd.get("itemId"));
   const { item } = await ownItem(itemId);
   if (item.status !== "awaiting_approval") redirect(`/app/items/${itemId}`);
-  db.update(schema.contentItems).set({ status: "scheduled", updatedAt: new Date(), slotAt: catchUp(item.slotAt) }).where(eq(schema.contentItems.id, itemId)).run();
+  db.update(schema.contentItems).set({ status: "scheduled", pendingNote: null, updatedAt: new Date(), slotAt: catchUp(item.slotAt) }).where(eq(schema.contentItems.id, itemId)).run();
   db.insert(schema.approvals).values({ itemId, decision: "approved" }).run();
   revalidatePath("/app");
   const next = String(fd.get("next") || "");
@@ -39,11 +39,28 @@ export async function requestChanges(_: ChangeState, fd: FormData): Promise<Chan
   if (!["awaiting_approval", "failed"].includes(item.status)) return { error: "This item is already being remade." };
   if (item.status === "failed") startRemake(itemId, customer.id, comment, "retry");
   else {
-    if (remakeAllowance(customer.id).left <= 0) return { error: "You’ve used this month’s free remakes. Use the paid remake button below." };
-    startRemake(itemId, customer.id, comment, "free");
+    // with rounds left, the note waits for the next revision round; it's sent with the others in one go
+    if (remakeAllowance(customer.id).left <= 0) return { error: "You’ve used this month’s revision rounds. Use the paid change button below." };
+    setPendingNote(itemId, comment);
   }
   revalidatePath("/app");
+  redirect(`/app/items/${itemId}${item.status === "failed" ? "" : "?noted=1"}`);
+}
+
+export async function clearChangeNote(fd: FormData) {
+  const itemId = String(fd.get("itemId"));
+  await ownItem(itemId);
+  setPendingNote(itemId, null);
+  revalidatePath("/app");
   redirect(`/app/items/${itemId}`);
+}
+
+/** Sends every noted change as one revision round. */
+export async function submitRevisionRound(): Promise<void> {
+  const { customer } = await requireCustomer();
+  const r = submitRound(customer.id);
+  revalidatePath("/app");
+  redirect(r.ok ? `/app?round=${r.items}` : `/app?round_error=${encodeURIComponent(r.error)}`);
 }
 
 /** Paid remake (after the monthly free ones): opens a Razorpay payment; the remake starts once it's paid. */
@@ -54,9 +71,9 @@ export async function startPaidRemake(_: ChangeState, fd: FormData): Promise<Cha
   if (comment.length < 4) return { error: "Say what to change, even in a few words, so the next version gets it right." };
   if (item.status !== "awaiting_approval") return { error: "This item is already being remade." };
   const allowance = remakeAllowance(customer.id);
-  if (allowance.left > 0) { startRemake(itemId, customer.id, comment, "free"); revalidatePath("/app"); redirect(`/app/items/${itemId}`); }
+  if (allowance.left > 0) { setPendingNote(itemId, comment); revalidatePath("/app"); redirect(`/app/items/${itemId}?noted=1`); }
   const amount = remakePrice(item.type);
-  const label = `Extra remake (${item.type === "reel" ? "reel" : "post"})`;
+  const label = `Extra change (${item.type === "reel" ? "video" : "image"})`;
   if (!razorpayLive()) {
     // demo server: record a free demo payment and remake straight away
     const orderId = `demo_${Date.now()}`;
@@ -87,7 +104,7 @@ export async function approveAllReady(fd: FormData) {
   const { customer } = await requireCustomer();
   const planId = String(fd.get("planId"));
   const ready = db.select({ id: schema.contentItems.id }).from(schema.contentItems)
-    .where(and(eq(schema.contentItems.customerId, customer.id), eq(schema.contentItems.planId, planId), eq(schema.contentItems.status, "awaiting_approval"))).all();
+    .where(and(eq(schema.contentItems.customerId, customer.id), eq(schema.contentItems.planId, planId), eq(schema.contentItems.status, "awaiting_approval"), isNull(schema.contentItems.pendingNote))).all();
   if (ready.length) {
     db.update(schema.contentItems).set({ status: "scheduled", updatedAt: new Date() }).where(inArray(schema.contentItems.id, ready.map((r) => r.id))).run();
     // anything whose time already passed goes out over the next hour, 15 minutes apart

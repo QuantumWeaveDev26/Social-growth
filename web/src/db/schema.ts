@@ -34,7 +34,9 @@ export const plans = sqliteTable("plans", {
   priceInr: integer("price_inr").notNull(),
   posts: integer("posts").notNull(),
   reels: integer("reels").notNull(),
-  revisions: integer("revisions").notNull().default(2),
+  revisions: integer("revisions").notNull().default(2), // revision rounds per monthly cycle (one round = one batch of notes)
+  campaigns: integer("campaigns").notNull().default(0), // Meta ad campaigns set up and managed by the team
+  adBudgetInr: integer("ad_budget_inr").notNull().default(0), // suggested Meta ad budget per campaign, paid by the client to Meta
   report: integer("report", { mode: "boolean" }).notNull().default(false),
   features: text("features").notNull(), // JSON list
   sort: integer("sort").notNull().default(0),
@@ -118,6 +120,7 @@ export const contentItems = sqliteTable("content_items", {
   status: text("status").notNull().default("planned"),
   // planned | generating | awaiting_approval | changes_requested | approved | scheduled | published | failed
   revisionCount: integer("revision_count").notNull().default(0),
+  pendingNote: text("pending_note"), // change the owner noted for the next revision round
   error: text("error"),
   costUsd: real("cost_usd").notNull().default(0),
   updatedAt: now("updated_at"),
@@ -128,7 +131,7 @@ export const approvals = sqliteTable("approvals", {
   itemId: text("item_id").notNull(),
   decision: text("decision").notNull(), // approved | changes
   comment: text("comment"),
-  charge: text("charge").notNull().default("free"), // free (counts toward the monthly allowance) | paid | retry
+  charge: text("charge").notNull().default("free"), // round (part of a revision round) | paid | retry | free (older remakes)
   createdAt: now("created_at"),
 });
 

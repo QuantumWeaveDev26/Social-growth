@@ -55,7 +55,7 @@ export function PlanStep({ plans, current, live, paid }: { plans: Plan[]; curren
             <input type="radio" name="plan" value={p.id} checked={selected === p.id} onChange={() => setSelected(p.id)} className="size-4 accent-[#1F9D74]" />
             <span className="flex-1">
               <span className="block font-semibold">{p.name}</span>
-              <span className="tnum block text-sm text-ink-2">{p.posts} posts + {p.reels} reels a month · {p.revisions} free remakes a month</span>
+              <span className="tnum block text-sm text-ink-2">{p.posts} images + {p.reels} videos a month · {p.revisions} revision round{p.revisions === 1 ? "" : "s"} a month</span>
               <span className="mt-1 block text-xs text-ink-3">{(JSON.parse(p.features || "[]") as string[]).slice(2).join(" · ")}</span>
             </span>
             <span className="tnum font-display text-xl" style={{ fontWeight: 700 }}>{inr(p.priceInr)}</span>

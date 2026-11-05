@@ -58,6 +58,9 @@ function migrate(d: Database.Database) {
   addCol("subscriptions", "rzp_subscription_id", "text");
   addCol("subscriptions", "rzp_status", "text");
   addCol("approvals", "charge", "text not null default 'free'");
+  addCol("plans", "campaigns", "integer not null default 0");
+  addCol("plans", "ad_budget_inr", "integer not null default 0");
+  addCol("content_items", "pending_note", "text"); // change noted for the next revision round
   d.exec("create table if not exists kv (key text primary key not null, value text not null)");
   d.exec(`create table if not exists workers (
     id text primary key not null, host text not null, concurrency integer not null,

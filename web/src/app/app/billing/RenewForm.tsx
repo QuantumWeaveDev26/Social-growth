@@ -36,7 +36,7 @@ export function PlanForm({ plans, current, mode, label }: { plans: Plan[]; curre
         {plans.map((p) => (
           <label key={p.id} className={`flex cursor-pointer items-center gap-4 px-4 py-3 ${plan === p.id ? "bg-mint-wash/60" : "hover:bg-sheet"}`}>
             <input type="radio" name="plan" value={p.id} checked={plan === p.id} onChange={() => setPlan(p.id)} className="size-4 accent-[#1F9D74]" />
-            <span className="flex-1"><span className="font-semibold">{p.name}</span> <span className="tnum text-sm text-ink-2">· {p.posts} posts + {p.reels} reels</span></span>
+            <span className="flex-1"><span className="font-semibold">{p.name}</span> <span className="tnum text-sm text-ink-2">· {p.posts} images + {p.reels} videos</span></span>
             <span className="tnum font-semibold">{inr(p.priceInr)}<span className="text-xs font-normal text-ink-3">/mo</span></span>
           </label>
         ))}

@@ -56,13 +56,16 @@ export function applySubscriptionCharge(o: {
   return true;
 }
 
-/** Start of the client's current monthly cycle (free remakes reset here). */
+/** Start of the client’s current monthly cycle (revision rounds reset here). */
 export function cycleStart(sub: { periodStart: Date | null; periodEnd: Date | null; createdAt: Date } | undefined) {
   if (!sub) return new Date(0);
   if (sub.periodEnd) {
-    const back = new Date(sub.periodEnd.getTime() - PERIOD_DAYS * DAY);
-    // auto-pay periods follow Razorpay's calendar month; demo/early renewals can stack, so cap at 30 days back
-    return sub.periodStart && sub.periodStart > back ? sub.periodStart : back;
+    // paid months can stack (early renewals), so count back in 30-day steps to the cycle that contains today
+    const now = Date.now();
+    const ahead = sub.periodEnd.getTime() > now ? Math.floor((sub.periodEnd.getTime() - now) / (PERIOD_DAYS * DAY)) : 0;
+    const back = new Date(sub.periodEnd.getTime() - (ahead + 1) * PERIOD_DAYS * DAY);
+    // auto-pay periods follow Razorpay's calendar month: use the real start when it falls inside this cycle
+    return sub.periodStart && sub.periodStart > back && sub.periodStart.getTime() <= now ? sub.periodStart : back;
   }
   return sub.periodStart ?? sub.createdAt;
 }

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
-import { Film, AlertTriangle, CheckCheck, Loader2 } from "lucide-react";
+import { Film, AlertTriangle, CheckCheck, Loader2, PencilLine } from "lucide-react";
 import { db, schema } from "@/db";
 import { requireCustomer } from "@/lib/auth";
 import { ApproveMark } from "@/components/ui";
@@ -8,7 +8,8 @@ import { AutoRefresh } from "@/components/AutoRefresh";
 import { SubmitButton } from "@/components/SubmitButton";
 import { mediaUrl } from "@/lib/storage";
 import { fmtTime, monthLabel } from "@/lib/format";
-import { approveAllReady, startNextMonth } from "./actions";
+import { approveAllReady, startNextMonth, submitRevisionRound } from "./actions";
+import { pendingNotes, remakeAllowance } from "@/lib/remakes";
 
 export const metadata = { title: "Proof sheet" };
 
@@ -22,7 +23,7 @@ const FILTERS = [
 const groupOf = (s: string) =>
   s === "awaiting_approval" || s === "failed" ? "review" : ["planned", "generating", "changes_requested"].includes(s) ? "making" : "approved";
 
-export default async function ProofSheet({ searchParams }: { searchParams: Promise<{ month?: string; show?: string; approved?: string; welcome?: string }> }) {
+export default async function ProofSheet({ searchParams }: { searchParams: Promise<{ month?: string; show?: string; approved?: string; welcome?: string; round?: string; round_error?: string }> }) {
   const { customer } = await requireCustomer();
   const sp = await searchParams;
   const plans = db.select().from(schema.contentPlans).where(eq(schema.contentPlans.customerId, customer.id)).orderBy(asc(schema.contentPlans.month)).all();
@@ -41,7 +42,7 @@ export default async function ProofSheet({ searchParams }: { searchParams: Promi
         {planJob ? (
           <>
             <p className="mt-3 max-w-[60ch] text-ink-2">We’re choosing topics from your brand profile and spacing them across the month. Frames will appear here as each post is made, usually within a few minutes.</p>
-            <div className="mt-10 grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">{Array.from({ length: 12 }).map((_, i) => <div key={i} className="developing aspect-square rounded-[8px]" />)}</div>
+            <div className="mt-10 grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">{Array.from({ length: 12 }).map((_, i) => <div key={i} className="developing aspect-[4/5] rounded-[8px]" />)}</div>
           </>
         ) : (
           <>
@@ -56,7 +57,7 @@ export default async function ProofSheet({ searchParams }: { searchParams: Promi
   const items = db.select().from(schema.contentItems).where(eq(schema.contentItems.planId, plan.id)).orderBy(asc(schema.contentItems.slotAt)).all();
   const counts = { review: 0, making: 0, approved: 0 } as Record<string, number>;
   items.forEach((i) => counts[groupOf(i.status)]++);
-  const ready = items.filter((i) => i.status === "awaiting_approval").length;
+  const ready = items.filter((i) => i.status === "awaiting_approval" && !i.pendingNote).length;
   const show = FILTERS.some((f) => f.id === sp.show) ? sp.show! : "all";
   const visible = show === "all" ? items : items.filter((i) => groupOf(i.status) === show);
   const posts = items.filter((i) => i.type === "post").length;
@@ -70,6 +71,8 @@ export default async function ProofSheet({ searchParams }: { searchParams: Promi
     const key = mon.toISOString().slice(0, 10);
     weeks.set(key, [...(weeks.get(key) || []), it]);
   }
+  const noted = pendingNotes(customer.id);
+  const rounds = remakeAllowance(customer.id);
   const fmtWeek = (k: string) => new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(k));
 
   return (
@@ -88,7 +91,7 @@ export default async function ProofSheet({ searchParams }: { searchParams: Promi
             )}
           </div>
           <p className="tnum mt-3 text-ink-2">
-            {posts} posts and {items.length - posts} reels · <span className="font-semibold text-ink">{counts.review} to review</span> · {counts.approved} approved{counts.making ? ` · ${counts.making} being made` : ""}
+            {posts} images and {items.length - posts} videos · <span className="font-semibold text-ink">{counts.review} to review</span> · {counts.approved} approved{counts.making ? ` · ${counts.making} being made` : ""}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -103,6 +106,28 @@ export default async function ProofSheet({ searchParams }: { searchParams: Promi
           )}
         </div>
       </header>
+
+      {sp.round && (
+        <p role="status" className="mt-6 rounded-[12px] bg-mint-wash px-5 py-4 text-[0.95rem] text-mint-deep">
+          Revision round sent: {sp.round} item{sp.round === "1" ? " is" : "s are"} being remade with your notes. {rounds.left} round{rounds.left === 1 ? "" : "s"} left this month.
+        </p>
+      )}
+      {sp.round_error && <p role="alert" className="mt-6 rounded-[12px] bg-red-wash px-5 py-4 text-[0.95rem] text-red">{sp.round_error}</p>}
+      {noted.length > 0 && (
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-[14px] bg-amber-wash px-5 py-4">
+          <p className="text-[0.95rem] text-amber-deep">
+            <span className="font-semibold">{noted.length} change{noted.length === 1 ? "" : "s"} noted.</span>{" "}
+            {rounds.left > 0
+              ? <>Add notes on any other items first, then send them together. This uses 1 of your {rounds.left} revision round{rounds.left === 1 ? "" : "s"} left.</>
+              : <>You’ve used this month’s revision rounds. Open each item to change it for ₹199 an image or ₹399 a video, or wait until they reset.</>}
+          </p>
+          {rounds.left > 0 && (
+            <form action={submitRevisionRound}>
+              <SubmitButton className="btn btn-primary" pending="Sending"><PencilLine className="size-4" aria-hidden />Submit revision round</SubmitButton>
+            </form>
+          )}
+        </div>
+      )}
 
       {sp.welcome && counts.review === 0 && (
         <p className="mt-6 rounded-[12px] bg-mint-wash px-5 py-4 text-[0.95rem] text-mint-deep">
@@ -140,7 +165,7 @@ export default async function ProofSheet({ searchParams }: { searchParams: Promi
                   return (
                     <li key={it.id}>
                       <Link href={`/app/items/${it.id}`} className="group block rounded-[10px] focus-visible:outline-offset-4">
-                        <div className={`relative aspect-square overflow-hidden rounded-[8px] bg-[#e7ece9] ring-1 ring-line transition-shadow duration-300 group-hover:shadow-[var(--shadow-lift)] ${it.status === "awaiting_approval" ? "ring-2 ring-ink" : ""}`}>
+                        <div className={`relative aspect-[4/5] overflow-hidden rounded-[8px] bg-[#e7ece9] ring-1 ring-line transition-shadow duration-300 group-hover:shadow-[var(--shadow-lift)] ${it.status === "awaiting_approval" ? "ring-2 ring-ink" : ""}`}>
                           {making || !it.thumbPath ? (
                             <div className="developing flex size-full flex-col justify-end p-3">
                               <p className="flex items-center gap-1.5 text-[0.72rem] font-semibold text-ink-3">
@@ -154,7 +179,9 @@ export default async function ProofSheet({ searchParams }: { searchParams: Promi
                           )}
                           {it.type === "reel" && <span className="chip absolute left-2 top-2 bg-ink/85 text-white"><Film className="size-3" aria-hidden />Reel</span>}
                           {approved && <ApproveMark draw={draw} className="absolute bottom-0.5 right-0.5 w-14 drop-shadow-[0_2px_3px_rgba(0,0,0,0.3)]" />}
-                          {it.status === "awaiting_approval" && <span className="chip absolute bottom-2 left-2 bg-ink text-white">Needs your OK</span>}
+                          {it.status === "awaiting_approval" && (it.pendingNote
+                            ? <span className="chip absolute bottom-2 left-2 bg-amber text-white">Change noted</span>
+                            : <span className="chip absolute bottom-2 left-2 bg-ink text-white">Needs your OK</span>)}
                           {it.status === "published" && <span className="chip absolute bottom-2 left-2 bg-mint text-white">Posted</span>}
                           {it.status === "failed" && it.thumbPath && <span className="chip absolute bottom-2 left-2 bg-red-wash text-red">Needs attention</span>}
                         </div>

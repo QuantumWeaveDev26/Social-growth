@@ -67,7 +67,7 @@ export default async function ItemPage({ params, searchParams }: { params: Promi
   const ig = (
     <div className="overflow-hidden rounded-[14px] bg-white ring-1 ring-line">
       <div className="flex items-center gap-2.5 px-3.5 py-2.5">{avatar}<span className="text-[0.88rem] font-semibold">{handle}</span></div>
-      <div className={`${item.type === "reel" ? "aspect-[9/16] max-h-[620px]" : "aspect-square"} w-full`}>{media}</div>
+      <div className={`${item.type === "reel" ? "aspect-[9/16] max-h-[620px]" : "aspect-[4/5]"} w-full`}>{media}</div>
       <div className="flex items-center gap-4 px-3.5 pt-3 text-ink"><Heart className="size-6" aria-hidden /><MessageCircle className="size-6" aria-hidden /><Send className="size-6" aria-hidden /><Bookmark className="ml-auto size-6" aria-hidden /></div>
       <p className="whitespace-pre-line px-3.5 pb-4 pt-2 text-[0.88rem] leading-relaxed"><span className="font-semibold">{handle}</span> {copy?.instagram_caption}</p>
     </div>
@@ -76,7 +76,7 @@ export default async function ItemPage({ params, searchParams }: { params: Promi
     <div className="overflow-hidden rounded-[14px] bg-white ring-1 ring-line">
       <div className="flex items-center gap-2.5 px-4 py-3">{avatar}<span><span className="block text-[0.9rem] font-semibold">{conn?.pageName || customer.businessName}</span><span className="block text-[0.75rem] text-ink-3">{fmtDateTime(item.slotAt)}</span></span></div>
       <p className="whitespace-pre-line px-4 pb-3 text-[0.92rem] leading-relaxed">{copy?.facebook_post}</p>
-      <div className={`${item.type === "reel" ? "aspect-[9/16] max-h-[620px]" : "aspect-square"} w-full`}>{media}</div>
+      <div className={`${item.type === "reel" ? "aspect-[9/16] max-h-[620px]" : "aspect-[4/5]"} w-full`}>{media}</div>
       <div className="flex justify-around border-t border-line py-2.5 text-[0.85rem] font-semibold text-ink-2"><span className="flex items-center gap-1.5"><ThumbsUp className="size-4" aria-hidden />Like</span><span className="flex items-center gap-1.5"><MessageCircle className="size-4" aria-hidden />Comment</span><span className="flex items-center gap-1.5"><Share2 className="size-4" aria-hidden />Share</span></div>
     </div>
   );
@@ -120,7 +120,7 @@ export default async function ItemPage({ params, searchParams }: { params: Promi
                 <p className="min-w-[12rem] flex-1 text-sm text-ink-2">{nextToReview ? "Then we take you to the next one." : "This is the last one waiting."}</p>
               </form>
               <div className="mt-6 border-t border-line pt-5">
-                <ChangesForm itemId={id} {...remakeProps} />
+                <ChangesForm itemId={id} {...remakeProps} pendingNote={item.pendingNote} />
               </div>
             </div>
           )}

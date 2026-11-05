@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import { planContents } from "@/lib/plans";
 import { db, schema } from "@/db";
 import { requireCustomer } from "@/lib/auth";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -32,7 +33,7 @@ export default async function Settings({ searchParams }: { searchParams: Promise
 
         <section className="grid grid-cols-1 gap-4 md:grid-cols-[220px_minmax(0,1fr)] md:gap-10 py-9">
           <div><h2 className="font-bold">Plan</h2><p className="mt-1 text-sm text-ink-2">Billed every 30 days.</p></div>
-          <p className="text-ink-2">{plan ? `${plan.name} · ${plan.posts} posts and ${plan.reels} reels a month.` : "No active plan."} <a href="/app/billing" className="font-semibold text-mint-deep underline">Billing and renewals</a></p>
+          <p className="text-ink-2">{plan ? `${plan.name} · ${planContents(plan)} a month.` : "No active plan."} <a href="/app/billing" className="font-semibold text-mint-deep underline">Billing and renewals</a></p>
         </section>
 
         <form action={saveSettings} className="grid grid-cols-1 gap-4 md:grid-cols-[220px_minmax(0,1fr)] md:gap-10 py-9">

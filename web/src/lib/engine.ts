@@ -265,7 +265,7 @@ async function makeItem(itemId: string, step: StepFn = () => {}) {
 
   if (item.type === "post") {
     step("Creating the image");
-    const img = await generateImage(String(copy.image_prompt), "1024x1024");
+    const img = await generateImage(String(copy.image_prompt), "4:5");
     addCost(itemId, img.costUsd);
     step("Adding the logo");
     const final = await withLogo(img.png, logo);

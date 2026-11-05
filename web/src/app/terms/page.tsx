@@ -13,7 +13,7 @@ export default function Terms() {
         <li>You must have the right to manage the Facebook Page and Instagram account you connect.</li>
       </ul>
       <h2>Approvals and changes</h2>
-      <p>Each plan includes 3 free remakes a month, shared across all your posts and reels. After those, an extra remake costs ₹199 for a post or ₹399 for a reel, paid before it is made. Remaking a post that failed to generate is always free. Approving an item means you are happy for it to be published as shown. You are responsible for checking facts, prices and offers in your content before you approve it.</p>
+      <p>Each plan includes a number of revision rounds a month (shown on the pricing page). In one round you send notes on any of the items in your month together, and we remake those items. After your rounds are used, a change to one item costs ₹199 for an image or ₹399 for a video, paid before it is made. Plan fees include GST. Your Meta advertising budget is separate and is paid by you directly to Meta; it is not part of our fee. Remaking a post that failed to generate is always free. Approving an item means you are happy for it to be published as shown. You are responsible for checking facts, prices and offers in your content before you approve it.</p>
       <h2>Plans and payment</h2>
       <p>Plans are billed monthly in Indian rupees, including GST. Payment is by monthly auto-pay through Razorpay (UPI Autopay or card): you approve the mandate once and are charged the plan price each month on the same date. There is no long-term contract. Advertising spend, where your plan includes ad setup, is paid by you directly to Meta.</p>
       <h2>What we do not promise</h2>

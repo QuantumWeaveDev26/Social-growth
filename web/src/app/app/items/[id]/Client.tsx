@@ -1,7 +1,7 @@
 "use client";
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { requestChanges, startPaidRemake, finishPaidRemake } from "../../actions";
+import { requestChanges, startPaidRemake, finishPaidRemake, clearChangeNote } from "../../actions";
 import { SubmitButton } from "@/components/SubmitButton";
 import { FormError } from "@/components/ui";
 
@@ -9,12 +9,13 @@ const QUICK = ["Make the photo warmer and brighter", "Shorter caption", "Less sa
 
 declare global { interface Window { Razorpay?: new (o: Record<string, unknown>) => { open: () => void } } }
 
-export function ChangesForm({ itemId, freeLeft, freeTotal, resetsOn, price, kind, live, free = false }: {
-  itemId: string; freeLeft: number; freeTotal: number; resetsOn: string; price: number; kind: "post" | "reel"; live: boolean; free?: boolean;
+export function ChangesForm({ itemId, freeLeft, freeTotal, resetsOn, price, kind, live, free = false, pendingNote = null }: {
+  itemId: string; freeLeft: number; freeTotal: number; resetsOn: string; price: number; kind: "post" | "reel"; live: boolean; free?: boolean; pendingNote?: string | null;
 }) {
   const paid = !free && freeLeft <= 0;
   const [state, action] = useActionState(paid ? startPaidRemake : requestChanges, undefined);
-  const [text, setText] = useState("");
+  const [text, setText] = useState(pendingNote || "");
+  const what = kind === "reel" ? "video" : "image";
   const [payErr, setPayErr] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const router = useRouter();
@@ -40,7 +41,15 @@ export function ChangesForm({ itemId, freeLeft, freeTotal, resetsOn, price, kind
   return (
     <form action={action}>
       <input type="hidden" name="itemId" value={itemId} />
-      <label htmlFor="comment" className="label">{free ? "What should we do differently?" : "Not quite right? Tell us what to change"}</label>
+      {pendingNote && !paid && (
+        <div className="mb-4 rounded-[10px] bg-mint-wash px-3 py-2.5 text-sm text-mint-deep">
+          <p className="font-semibold">Change noted for your next revision round</p>
+          <p className="mt-0.5 text-ink-2">“{pendingNote}”</p>
+          <p className="mt-1">Note changes on any other items too, then click <b>Submit revision round</b> on your proof sheet to send them all at once.</p>
+          <button formAction={clearChangeNote} className="mt-1.5 text-sm font-semibold underline">Remove this note</button>
+        </div>
+      )}
+      <label htmlFor="comment" className="label">{free ? "What should we do differently?" : pendingNote && !paid ? "Edit your note" : "Not quite right? Tell us what to change"}</label>
       <textarea id="comment" name="comment" rows={3} value={text} onChange={(e) => setText(e.target.value)} className="field" placeholder="Use a photo of the shop front instead, and mention we open at 7am." />
       <div className="mt-2 flex flex-wrap gap-1.5">
         {QUICK.map((q) => (
@@ -50,14 +59,14 @@ export function ChangesForm({ itemId, freeLeft, freeTotal, resetsOn, price, kind
       </div>
       {paid && (
         <p className="mt-4 rounded-[10px] bg-amber-wash px-3 py-2 text-sm text-amber-deep">
-          You’ve used your {freeTotal} free remakes this month. They reset on {resetsOn}. You can still remake this {kind} now for {priceLabel}, paid securely with Razorpay.
+          You’ve used your {freeTotal} revision round{freeTotal === 1 ? "" : "s"} this month. They reset on {resetsOn}. You can still change this {what} now for {priceLabel} (GST included), paid securely with Razorpay.
         </p>
       )}
       <div className="mt-4 flex items-center gap-4">
         <SubmitButton className="btn btn-amber" pending={paid ? "Opening payment" : "Sending"} disabled={text.trim().length < 4 || confirming}>
-          {confirming ? "Confirming payment…" : paid ? `Pay ${priceLabel} and remake${live ? "" : " (demo)"}` : "Remake with my note"}
+          {confirming ? "Confirming payment…" : paid ? `Pay ${priceLabel} and remake${live ? "" : " (demo)"}` : free ? "Try again with my note" : pendingNote ? "Update note" : "Add to revision round"}
         </SubmitButton>
-        {!free && !paid && <span className="tnum text-sm text-ink-3">{freeLeft} of {freeTotal} free remakes left this month</span>}
+        {!free && !paid && <span className="tnum text-sm text-ink-3">{freeLeft} of {freeTotal} revision round{freeTotal === 1 ? "" : "s"} left this month</span>}
       </div>
       <div className="mt-3"><FormError message={state?.error || payErr} /></div>
     </form>

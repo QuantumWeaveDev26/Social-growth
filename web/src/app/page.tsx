@@ -21,7 +21,7 @@ const FAQ = [
   ["Do I need to write anything?", "No. You fill a short form about your business once. We read your website too. From that we write a brand profile you can correct, and every post comes from it."],
   ["Will anything go live without me seeing it?", "Never. Each post and reel waits on your proof sheet until you approve it. If you ask for changes, we remake it with your note and send it back."],
   ["How do you post to my accounts?", "You connect your Facebook Page and Instagram professional account through Meta’s own login. We only ask for publishing permissions, and you can disconnect at any time."],
-  ["What if I don’t like the style?", "Tell us in one line on any post. Your notes shape the next version and the rest of the month. Every plan includes 3 free remakes a month; extra remakes are ₹199 a post or ₹399 a reel."],
+  ["What if I don’t like the style?", "Tell us in one line on any post. Your notes shape the next version and the rest of the month. Note what you’d change on any items, then send them together as one revision round (1 to 3 rounds a month, depending on your plan). After that, a change is ₹199 an image or ₹399 a video."],
   ["Can I cancel?", "Yes. Plans are monthly. Cancel before your next cycle and nothing more is charged."],
 ];
 
@@ -53,7 +53,7 @@ export default async function Landing() {
             A month of posts,<br />made for your business.<br /><span className="text-mint-deep">You just tick.</span>
           </h1>
           <p className="mt-6 max-w-[34rem] text-[1.05rem] leading-relaxed text-ink-2 sm:mt-7 sm:text-[1.15rem]">
-            Tell us what you sell and who buys it. BrandMint AI writes, designs and schedules your Instagram and Facebook posts and reels. Every piece waits for your approval before it goes live.
+            Tell us what you sell and who buys it. BrandMint AI makes your ad images and video ads, posts them to Instagram and Facebook, and our team runs your Meta ad campaigns. Every piece waits for your approval before it goes live.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3 sm:mt-9 sm:gap-4">
             <Link href="/signup" className="btn btn-primary px-6 py-3 text-base">Start your month <ArrowRight className="size-4" /></Link>
@@ -115,9 +115,9 @@ export default async function Landing() {
       <section id="pricing" className="mx-auto max-w-[1240px] px-4 py-16 sm:px-8 lg:py-24">
         <div className="flex flex-wrap items-end justify-between gap-6 lg:gap-10">
           <h2 className="max-w-[34rem] font-display text-[2rem] leading-[1.05] sm:text-[2.6rem] tracking-[-0.03em]" style={{ fontWeight: 800 }}>
-            Pick how much you want to post.
+            Pick the plan that fits your business.
           </h2>
-          <p className="max-w-[26rem] text-ink-2">Every plan includes strategy, design, captions, hashtags, scheduling and your approval step. Prices are per month, including GST.</p>
+          <p className="max-w-[26rem] text-ink-2">Every plan includes AI ad images and videos, captions, posting to Instagram and Facebook, Meta ad campaign setup and your approval step. Fees are per month, including GST. Your ad budget is separate and paid by you directly to Meta.</p>
         </div>
         <div className={`mt-10 grid grid-cols-1 overflow-hidden rounded-[16px] bg-sheet ring-1 ring-line lg:mt-12 ${plans.length >= 3 ? "md:grid-cols-3" : plans.length === 2 ? "md:grid-cols-2" : ""}`}>
           {plans.map((p, i) => {
@@ -127,13 +127,14 @@ export default async function Landing() {
               <div key={p.id} className={`flex flex-col p-6 sm:p-8 ${i ? "border-t border-line md:border-l md:border-t-0" : ""} ${featured ? "bg-ink text-white" : ""}`}>
                 <div className="flex items-center justify-between">
                   <h3 className="font-display text-xl" style={{ fontWeight: 700 }}>{p.name}</h3>
-                  {featured && <span className="chip bg-mint text-white">Best for Growth</span>}
+                  {featured && <span className="chip bg-mint text-white">Recommended</span>}
                 </div>
                 <p className="mt-5 flex items-baseline gap-1.5">
                   <span className="tnum font-display text-[2.8rem] leading-none tracking-[-0.03em]" style={{ fontWeight: 800 }}>{inr(p.priceInr)}</span>
                   <span className={featured ? "text-rail-text" : "text-ink-3"}>/month</span>
                 </p>
-                <p className={`tnum mt-3 font-semibold ${featured ? "text-white" : ""}`}>{p.posts} posts + {p.reels} reels</p>
+                <p className={`tnum mt-3 font-semibold ${featured ? "text-white" : ""}`}>{p.posts} images + {p.reels} videos a month</p>
+                {p.campaigns > 0 && <p className={`tnum mt-1 text-sm ${featured ? "text-rail-text" : "text-ink-2"}`}>{p.campaigns} ad campaign{p.campaigns === 1 ? "" : "s"} · suggested ad budget {inr(p.adBudgetInr)} <b>per campaign</b>, paid by you to Meta</p>}
                 <ul className="mt-6 flex-1 space-y-2.5 text-[0.93rem]">
                   {features.map((f) => (
                     <li key={f} className="flex gap-2.5">

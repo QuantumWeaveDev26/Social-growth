@@ -43,7 +43,7 @@ export async function rzpPlanFor(plan: Plan) {
   if (have) return have;
   const p = await rzp<{ id: string }>("/plans", "POST", {
     period: "monthly", interval: 1,
-    item: { name: `BrandMint AI · ${plan.name}`, amount: plan.priceInr * 100, currency: "INR", description: `${plan.posts} posts + ${plan.reels} reels a month` },
+    item: { name: `BrandMint AI · ${plan.name}`, amount: plan.priceInr * 100, currency: "INR", description: `${plan.posts} images + ${plan.reels} videos a month` },
     notes: { planId: plan.id },
   });
   kvSet(key, p.id);

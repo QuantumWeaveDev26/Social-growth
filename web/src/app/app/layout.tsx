@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import { planContents } from "@/lib/plans";
 import { LayoutGrid, CalendarClock, Fingerprint, Store, Settings2, LogOut, Activity, Bell, Receipt, UserRound } from "lucide-react";
 import { unreadCount } from "@/lib/notify";
 import { daysLeft } from "@/lib/billing";
@@ -23,7 +24,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <>
       <div className="rounded-[12px] bg-rail-2 px-4 py-3.5">
         <p className="truncate font-semibold text-white">{customer.businessName}</p>
-        <p className="tnum mt-0.5 text-[0.8rem]">{plan ? `${plan.name} · ${plan.posts} posts + ${plan.reels} reels` : "No plan"}</p>
+        <p className="tnum mt-0.5 text-[0.8rem]">{plan ? `${plan.name} · ${planContents(plan)}` : "No plan"}</p>
       </div>
       <nav className="mt-6 space-y-1" aria-label="Studio">
         <NavLink href="/app" exact icon={<LayoutGrid className="size-[18px]" aria-hidden />}>Proof sheet</NavLink>

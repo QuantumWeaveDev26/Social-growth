@@ -17,7 +17,7 @@ const SignUp = z.object({
   business: z.string().trim().min(2, "Enter your business name"),
   email: z.string().trim().toLowerCase().email("Enter a valid email"),
   password: z.string().min(8, "Use at least 8 characters for the password"),
-  plan: z.enum(["starter", "growth", "scale"]).optional().catch(undefined),
+  plan: z.enum(["starter", "growth", "premium"]).optional().catch(undefined),
 });
 
 export async function signUp(_: FormState, fd: FormData): Promise<FormState> {
