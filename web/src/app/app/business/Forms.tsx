@@ -1,5 +1,5 @@
 "use client";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { saveDetails, addPhotos } from "./actions";
 import { SubmitButton } from "@/components/SubmitButton";
 import { FormError } from "@/components/ui";
@@ -41,12 +41,21 @@ export function DetailsForm({ d }: { d: D }) {
 
 export function PhotoForm() {
   const [state, action] = useActionState(addPhotos, undefined);
+  const [err, setErr] = useState<string | null>(null);
+  const check = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = [...(e.target.files || [])];
+    const big = files.find((f) => f.size > 15_000_000);
+    const total = files.reduce((n, f) => n + f.size, 0);
+    const msg = big ? `${big.name} is over 15 MB.` : total > 55_000_000 ? "Those photos add up to over 55 MB. Add them a few at a time." : null;
+    setErr(msg);
+    if (msg) e.target.value = "";
+  };
   return (
     <form action={action} className="flex flex-wrap items-center gap-3">
-      <input type="file" name="photos" accept="image/*" multiple className="text-sm" />
+      <input type="file" name="photos" accept="image/*" multiple className="min-w-0 max-w-full text-sm" onChange={check} />
       <SubmitButton className="btn btn-ghost" pending="Uploading">Add photos</SubmitButton>
       {state?.ok && <span role="status" className="text-sm text-mint-deep">{state.ok}</span>}
-      <div className="w-full"><FormError message={state?.error} /></div>
+      <div className="w-full"><FormError message={err || state?.error} /></div>
     </form>
   );
 }

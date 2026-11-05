@@ -8,7 +8,7 @@ export function UploadForm() {
   const [state, action] = useActionState(uploadKnowledge, undefined);
   return (
     <form action={action} className="flex flex-wrap items-center gap-3">
-      <input type="file" name="file" accept=".md,.txt,text/markdown,text/plain" className="text-sm" />
+      <input type="file" name="file" accept=".md,.txt,text/markdown,text/plain" className="min-w-0 max-w-full text-sm" />
       <SubmitButton className="btn btn-primary" pending="Uploading">Upload knowledge file</SubmitButton>
       {state?.ok && <p role="status" className="w-full text-sm text-mint-deep">{state.ok}</p>}
       <div className="w-full"><FormError message={state?.error} /></div>

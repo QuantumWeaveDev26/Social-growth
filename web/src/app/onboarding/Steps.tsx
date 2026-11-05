@@ -165,13 +165,14 @@ export function BrandKitStep({ logo, colours, times }: { logo: string | null; co
   const [preview, setPreview] = useState<string | null>(logo);
   const [c1, setC1] = useState(colours[0] || "#1F9D74");
   const [c2, setC2] = useState(colours[1] || "#13221D");
+  const [logoErr, setLogoErr] = useState<string | null>(null);
   return (
     <form action={action} className="space-y-8">
       <div>
         <H>Your brand kit</H>
         <p className="mt-3 text-ink-2">We place your logo on every post and use your colours for text on images and reels.</p>
       </div>
-      <FormError message={state?.error} />
+      <FormError message={logoErr || state?.error} />
       <div className="grid grid-cols-1 gap-4 md:grid-cols-[200px_minmax(0,1fr)] md:gap-8 rounded-[14px] bg-sheet p-4 sm:p-6 ring-1 ring-line">
         <label className="group grid aspect-square cursor-pointer place-items-center overflow-hidden rounded-[12px] border border-dashed border-line-strong bg-white transition-colors hover:border-mint">
           {preview ? (
@@ -180,7 +181,7 @@ export function BrandKitStep({ logo, colours, times }: { logo: string | null; co
           ) : (
             <span className="flex flex-col items-center gap-2 text-sm text-ink-3 group-hover:text-mint-deep"><Upload className="size-5" aria-hidden />Upload logo</span>
           )}
-          <input type="file" name="logo" accept="image/png,image/jpeg,image/svg+xml,image/webp" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) setPreview(URL.createObjectURL(f)); }} />
+          <input type="file" name="logo" accept="image/png,image/jpeg,image/svg+xml,image/webp" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; if (f.size > 5 * 1024 * 1024) { setLogoErr("That logo is over 5 MB. Export a smaller PNG or JPG and try again."); e.target.value = ""; return; } setLogoErr(null); setPreview(URL.createObjectURL(f)); }} />
         </label>
         <div className="space-y-5">
           <div>

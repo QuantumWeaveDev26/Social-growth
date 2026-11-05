@@ -113,11 +113,11 @@ export default async function ItemPage({ params, searchParams }: { params: Promi
 
           {item.status === "awaiting_approval" && (
             <div className="mt-8 rounded-[14px] bg-sheet p-6 ring-1 ring-line">
-              <form action={approveItem} className="flex items-center gap-4">
+              <form action={approveItem} className="flex flex-wrap items-center gap-x-4 gap-y-2">
                 <input type="hidden" name="itemId" value={id} />
                 {nextToReview && <input type="hidden" name="next" value={nextToReview.id} />}
                 <SubmitButton className="btn btn-mint px-6 py-3 text-base" pending="Approving"><Check className="size-5" aria-hidden />Approve and schedule</SubmitButton>
-                <p className="text-sm text-ink-2">{nextToReview ? "Then we take you to the next one." : "This is the last one waiting."}</p>
+                <p className="min-w-[12rem] flex-1 text-sm text-ink-2">{nextToReview ? "Then we take you to the next one." : "This is the last one waiting."}</p>
               </form>
               <div className="mt-6 border-t border-line pt-5">
                 <ChangesForm itemId={id} {...remakeProps} />
