@@ -55,6 +55,18 @@ export async function adminRetryFailed(fd: FormData) {
   back(id);
 }
 
+/** Makes one reel again from scratch (new script, scene images, Veo clips and voice). Free for the client: no revision round used. */
+export async function adminRemakeReel(fd: FormData) {
+  await requireAdmin();
+  const id = String(fd.get("customerId"));
+  const itemId = String(fd.get("itemId"));
+  const it = db.select().from(schema.contentItems).where(and(eq(schema.contentItems.id, itemId), eq(schema.contentItems.customerId, id))).get();
+  if (!it || it.type !== "reel" || ["generating", "published"].includes(it.status)) return;
+  db.update(schema.contentItems).set({ status: "planned", error: null }).where(eq(schema.contentItems.id, itemId)).run();
+  enqueue("generate_item", { itemId }, { customerId: id });
+  back(id);
+}
+
 /** Starts jobs that were put on hold (scheduled far in the future). */
 export async function adminReleaseHeld(fd: FormData) {
   await requireAdmin();

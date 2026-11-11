@@ -10,7 +10,7 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { daysLeft } from "@/lib/billing";
 import { currentMonth, nextMonth, fmtDateTime, inr, monthLabel } from "@/lib/format";
 import { mediaUrl } from "@/lib/storage";
-import { adminChangePlan, adminExtend, adminSetStatus, adminRetryFailed, adminReleaseHeld, adminPlanMonth, adminRebuildProfile, adminAttachOwner, adminAllowGeneration, adminSetVeo, adminVeoTest, adminVeoCompare, adminCompareWriters, adminRedoImages } from "./actions";
+import { adminChangePlan, adminExtend, adminSetStatus, adminRetryFailed, adminReleaseHeld, adminPlanMonth, adminRebuildProfile, adminAttachOwner, adminAllowGeneration, adminSetVeo, adminVeoTest, adminVeoCompare, adminCompareWriters, adminRedoImages, adminRemakeReel } from "./actions";
 import { veoCompareResult, veoConfigured, veoFor, veoTestResult } from "@/lib/veo";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { generationPaused, generationAllowList } from "@/lib/jobs";
@@ -145,6 +145,36 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                 {redoing > 0 && <span className="text-sm text-ink-2">Redoing images: {redoing} left…</span>}
               </div>
               <p className="mt-2 text-sm text-ink-3">Redo makes a new picture for each post waiting for approval (about ₹10 each) and stamps the logo again. Use it after fixing a logo or an image problem.</p>
+            </section>
+          );
+        })()}
+
+        {(() => {
+          const reels = db.select().from(schema.contentItems).where(and(eq(schema.contentItems.customerId, id), eq(schema.contentItems.type, "reel"))).orderBy(asc(schema.contentItems.slotAt)).all();
+          if (!reels.length) return null;
+          const making = reels.some((r) => ["planned", "generating"].includes(r.status));
+          return (
+            <section className="mt-6 rounded-[14px] bg-sheet p-5 ring-1 ring-line">
+              <AutoRefresh active={making} ms={8000} />
+              <h2 className="font-bold">Reels</h2>
+              <p className="mt-1 text-sm text-ink-3">Remake films a reel again from scratch: new script, scene images, moving clips and voice (about ₹300–350 each with Veo). The client’s revision rounds are not used.</p>
+              <ul className="mt-3 divide-y divide-line">
+                {reels.map((r) => {
+                  const b = JSON.parse(r.brief || "{}");
+                  const busy = ["planned", "generating"].includes(r.status);
+                  return (
+                    <li key={r.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                      <span className="min-w-0">
+                        <span className="block truncate font-medium">{String(b.title || b.topic || "Reel")}</span>
+                        <span className="tnum text-sm text-ink-3">{r.slotAt ? `${fmtDateTime(r.slotAt)} · ` : ""}{busy ? "Making now…" : r.status.replace(/_/g, " ")}</span>
+                      </span>
+                      <form action={adminRemakeReel}><Hidden /><input type="hidden" name="itemId" value={r.id} />
+                        <SubmitButton className="btn btn-ghost" pending="Queued" disabled={busy || r.status === "published"}>{busy ? "Making…" : "Remake reel"}</SubmitButton>
+                      </form>
+                    </li>
+                  );
+                })}
+              </ul>
             </section>
           );
         })()}
