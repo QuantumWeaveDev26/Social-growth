@@ -378,11 +378,17 @@ async function makeItem(itemId: string, step: StepFn = () => {}) {
   // all scene images at once, then all Veo clips at once (much faster than one by one)
   step(`Creating ${scenes.length} scene images`);
   const imgs = await Promise.all(scenes.map((sc) => generateImage(
-    `${sc.visual_prompt} A single vertical 9:16 photograph (one frame, not a collage or grid), photorealistic, natural light, real Indian setting, clear space at top and bottom, absolutely no text, letters or logos.`,
+    `${sc.visual_prompt} A single vertical 9:16 photograph (one frame, not a collage or grid), photorealistic like a real documentary photo, natural light, real Indian setting, clear space at top and bottom, a calm settled moment where nothing is mid-action, any hands resting and natural with five fingers, no screen showing content, absolutely no text, letters or logos.`,
     "1024x1536",
   )));
   const scenePaths = imgs.map((img, i) => { addCost(itemId, img.costUsd); return saveFile(`${dir}/scene${i + 1}.png`, img.png); });
   const clipPaths: (string | null)[] = scenePaths.map(() => null);
+  // voice first: its timing decides how long each scene is on screen, so each clip can be filmed at that length
+  step("Recording the voiceover");
+  const tts = await textToSpeech(String(copy.vo_script));
+  addCost(itemId, tts.costUsd);
+  const voice = saveFile(`${dir}/voice.mp3`, tts.mp3);
+  const timing = sceneTiming(scenes, tts.alignment);
   if (veoFor(item.customerId)) {
     const waited: number[] = scenePaths.map(() => 0);
     const done: boolean[] = scenePaths.map(() => false);
@@ -391,6 +397,7 @@ async function makeItem(itemId: string, step: StepFn = () => {}) {
     await Promise.all(scenePaths.map(async (sp, i) => {
       try {
         const v = await imageToVideo(absPath(sp), motionPrompt(String(scenes[i].visual_prompt || ""), String(scenes[i].motion || "")), {
+          seconds: timing.clipSec[i],
           onWait: (sec) => { waited[i] = sec; report(); },
         });
         addCost(itemId, v.costUsd);
@@ -401,10 +408,6 @@ async function makeItem(itemId: string, step: StepFn = () => {}) {
       } finally { done[i] = true; report(); }
     }));
   }
-  step("Recording the voiceover");
-  const tts = await textToSpeech(String(copy.vo_script));
-  addCost(itemId, tts.costUsd);
-  const voice = saveFile(`${dir}/voice.mp3`, tts.mp3);
   const thumb = scenePaths[0];
   let mp4: string | null = null;
   try {
@@ -437,23 +440,53 @@ function wordsFromAlignment(a: Alignment) {
   return words;
 }
 
+/** Real clips are never slowed below this, or the motion starts to look like slow-motion AI footage. */
+const MIN_PLAYBACK = 0.9;
+const MAX_CLIP = 8;
+
+/**
+ * When each scene starts (from the voiceover's word timings), evened out so no scene outlasts an 8-second
+ * clip played at near-normal speed, plus the shortest Veo length (4, 6 or 8 s) that covers each scene.
+ */
+export function sceneTiming(scenes: Array<Record<string, string>>, alignment: Alignment) {
+  const words = wordsFromAlignment(alignment);
+  const norm = (w: string) => w.toLowerCase().replace(/[^a-z0-9']/g, "");
+  const nw = words.map((w) => norm(w.text));
+  const end = words.length ? words[words.length - 1].end : 25;
+  let ptr = 0;
+  const starts = scenes.map((s, i) => {
+    const key = String(s.spoken || "").split(/\s+/).map(norm).filter(Boolean).slice(0, 2);
+    let at = -1;
+    for (let k = ptr; k < nw.length && key.length; k++) if (nw[k] === key[0] && (key.length < 2 || nw[k + 1] === key[1])) { at = k; break; }
+    if (at < 0) at = Math.min(nw.length - 1, Math.round((i * nw.length) / scenes.length));
+    ptr = at + 1;
+    return i === 0 ? 0 : words[at]?.start ?? i * 6;
+  });
+  // even out: a scene longer than the longest clip can cover gives time to its neighbours
+  const maxLen = MAX_CLIP / MIN_PLAYBACK;
+  const n = starts.length;
+  if (n && end <= n * maxLen) {
+    for (let pass = 0; pass < 4; pass++) {
+      for (let i = n - 1; i >= 1; i--) { const to = i === n - 1 ? end : starts[i + 1]; if (to - starts[i] > maxLen) starts[i] = to - maxLen; }
+      for (let i = 1; i < n; i++) if (starts[i] - starts[i - 1] > maxLen) starts[i] = starts[i - 1] + maxLen;
+    }
+  }
+  const lens = starts.map((s, i) => (i < n - 1 ? starts[i + 1] : end) - s);
+  const clipSec = lens.map((l) => [4, 6, 8].find((c) => c >= l * MIN_PLAYBACK) ?? MAX_CLIP);
+  return { starts, clipSec, end };
+}
+
 async function renderReel(o: {
   dir: string; scenePaths: string[]; clipPaths?: (string | null)[]; voice: string; alignment: Alignment; scenes: Array<Record<string, string>>;
   cover: string; brand: typeof schema.customers.$inferSelect; logo: string | null;
 }) {
   const videoDir = process.env.VIDEO_DIR || path.resolve(process.cwd(), "../video");
   const words = wordsFromAlignment(o.alignment);
-  const norm = (w: string) => w.toLowerCase().replace(/[^a-z0-9']/g, "");
-  const nw = words.map((w) => norm(w.text));
-  let ptr = 0;
-  const beats = o.scenes.map((s, i) => {
-    const key = String(s.spoken || "").split(/\s+/).map(norm).filter(Boolean).slice(0, 2);
-    let at = -1;
-    for (let k = ptr; k < nw.length && key.length; k++) if (nw[k] === key[0] && (key.length < 2 || nw[k + 1] === key[1])) { at = k; break; }
-    if (at < 0) at = Math.min(nw.length - 1, Math.round((i * nw.length) / o.scenes.length));
-    ptr = at + 1;
-    return { startSec: i === 0 ? 0 : words[at]?.start ?? i * 6, text: String(s.on_screen_text || ""), image: `job/scene${i + 1}.png`, video: o.clipPaths?.[i] ? `job/scene${i + 1}.mp4` : null };
-  });
+  const t = sceneTiming(o.scenes, o.alignment);
+  const beats = o.scenes.map((s, i) => ({
+    startSec: t.starts[i], text: String(s.on_screen_text || ""), image: `job/scene${i + 1}.png`,
+    video: o.clipPaths?.[i] ? `job/scene${i + 1}.mp4` : null, clipSec: t.clipSec[i],
+  }));
   // stage assets into the Remotion public folder
   const jobPublic = path.join(videoDir, "public", "job");
   fs.rmSync(jobPublic, { recursive: true, force: true });

@@ -155,7 +155,7 @@ export async function imageToVideo(imagePath: string, prompt: string, o: { secon
   const mimeType = "image/jpeg";
   const op = await call<{ name: string }>(`${base(model)}:predictLongRunning`, {
     instances: [{ prompt, image: { bytesBase64Encoded: img, mimeType } }],
-    parameters: { aspectRatio: "9:16", durationSeconds: seconds, resolution: RESOLUTION, generateAudio: false, sampleCount: 1, personGeneration: "allow_adult", enhancePrompt: true },
+    parameters: { aspectRatio: "9:16", durationSeconds: seconds, resolution: RESOLUTION, generateAudio: false, sampleCount: 1, personGeneration: "allow_adult", enhancePrompt: true, negativePrompt: VEO_NEGATIVE_PROMPT },
   });
   const started = Date.now();
   for (;;) {
@@ -182,15 +182,27 @@ export async function imageToVideo(imagePath: string, prompt: string, o: { secon
  * `motion` is the scene-specific direction written by the reel writer; `visual` (the still-image description) is context.
  */
 export const motionPrompt = (visual: string, motion = "") => {
-  const action = motion.trim() || `Natural, lively real-time movement in this scene: ${visual}. Slow push-in.`;
+  const action = motion.trim() || `Slow, steady push-in on this scene: ${visual}. Only gentle natural life: soft light changes, slight fabric movement, background softly out of focus.`;
   return [
     action,
     `Scene context: ${visual}.`,
-    "Style: photorealistic, filmed on a modern cinema camera, natural skin tones and textures, real-world physics, smooth 24fps motion, shallow depth of field.",
-    "Continuity: start exactly from the provided image and keep the same people, hands, faces, products, place, colours and lighting; do not add new people, body parts or objects; no morphing.",
+    "Style: real documentary footage filmed on a tripod or slider with a cinema camera, calm and unhurried, natural skin tones and textures, real-world physics, real-time speed, shallow depth of field.",
+    "Continuity: the whole shot is the same moment as the provided image. Every object stays where it is, the same number of items stays in frame from the first frame to the last, and shapes, sizes, colours and printed designs never change. People stay in place and only move a little (breathing, blinking, a soft smile). Hands stay still.",
     "No text, letters, captions, signs with words, logos or watermarks. No dialogue or lip-sync.",
   ].join(" ");
 };
+
+/**
+ * What Veo should avoid (sent as the API's negativePrompt). Google's guidance is to describe the unwanted things
+ * rather than write "no …", so this is a plain list.
+ */
+export const VEO_NEGATIVE_PROMPT = [
+  "morphing", "objects appearing or disappearing", "objects duplicating or multiplying", "changing number of items",
+  "objects merging or splitting", "shape-shifting products", "changing patterns or prints", "warped or melting surfaces",
+  "deformed hands", "extra fingers", "hands picking up or folding things", "content changing on screens",
+  "flickering", "sudden scene changes", "fast camera movement", "whip pan", "slow motion", "distorted faces",
+  "text", "subtitles", "watermark", "logo",
+].join(", ");
 
 /** Admin test: films one clip from this client's most recent image and records the result. */
 export async function runVeoTest(customerId: string) {

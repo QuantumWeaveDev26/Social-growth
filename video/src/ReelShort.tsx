@@ -8,8 +8,8 @@ import type { Caption, TikTokPage } from "@remotion/captions";
 const FONT = "Poppins";
 [500, 700, 800].forEach((w) => loadFont({ family: FONT, url: staticFile(`fonts/poppins-latin-${w}-normal.woff2`), weight: String(w) }));
 
-export type ReelBeat = { startSec: number; text: string; image: string; video?: string | null };
-const CLIP_SEC = 8; // Veo clip length
+export type ReelBeat = { startSec: number; text: string; image: string; video?: string | null; clipSec?: number };
+const CLIP_SEC = 8; // default Veo clip length
 export type ReelShortProps = {
   audio: string;
   durationSec: number;
@@ -30,8 +30,8 @@ const Scene: React.FC<{ beat: ReelBeat; accent: string; len: number }> = ({ beat
   return (
     <AbsoluteFill>
       {beat.video ? (
-        // real motion clip: slowed down slightly if the beat is longer than the clip, so it never freezes
-        <Video src={staticFile(beat.video)} muted objectFit="cover" playbackRate={Math.min(1, Math.max(0.5, (CLIP_SEC * fps) / Math.max(1, len)))} style={{ width: "100%", height: "100%" }} />
+        // real motion clip at (near) normal speed: clips are filmed to fit the scene, so at most a 10% slow-down
+        <Video src={staticFile(beat.video)} muted objectFit="cover" playbackRate={Math.min(1, Math.max(0.9, ((beat.clipSec || CLIP_SEC) * fps) / Math.max(1, len)))} style={{ width: "100%", height: "100%" }} />
       ) : (
         <Img src={staticFile(beat.image)} style={{ width: "100%", height: "100%", objectFit: "cover", scale: interpolate(frame, [0, len], [1.03, 1.13], clamp) }} />
       )}
