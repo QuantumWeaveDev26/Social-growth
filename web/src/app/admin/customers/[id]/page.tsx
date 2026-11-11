@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, asc, desc, eq, gt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import { ArrowLeft } from "lucide-react";
 import { db, schema } from "@/db";
 import { requireAdmin } from "@/lib/auth";
@@ -10,7 +10,7 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { daysLeft } from "@/lib/billing";
 import { currentMonth, nextMonth, fmtDateTime, inr, monthLabel } from "@/lib/format";
 import { mediaUrl } from "@/lib/storage";
-import { adminChangePlan, adminExtend, adminSetStatus, adminRetryFailed, adminReleaseHeld, adminPlanMonth, adminRebuildProfile, adminAttachOwner, adminAllowGeneration, adminSetVeo, adminVeoTest, adminVeoCompare, adminCompareWriters } from "./actions";
+import { adminChangePlan, adminExtend, adminSetStatus, adminRetryFailed, adminReleaseHeld, adminPlanMonth, adminRebuildProfile, adminAttachOwner, adminAllowGeneration, adminSetVeo, adminVeoTest, adminVeoCompare, adminCompareWriters, adminRedoImages } from "./actions";
 import { veoCompareResult, veoConfigured, veoFor, veoTestResult } from "@/lib/veo";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { generationPaused, generationAllowList } from "@/lib/jobs";
@@ -129,6 +129,25 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
             })()}
           </section>
         </div>
+
+        {(() => {
+          const rows = db.select({ status: schema.contentItems.status, type: schema.contentItems.type }).from(schema.contentItems).where(eq(schema.contentItems.customerId, id)).all();
+          const failed = rows.filter((r) => r.status === "failed").length;
+          const review = rows.filter((r) => r.status === "awaiting_approval" && r.type === "post").length;
+          const redoing = db.select({ id: schema.jobs.id }).from(schema.jobs).where(and(eq(schema.jobs.customerId, id), eq(schema.jobs.type, "redo_image"), inArray(schema.jobs.status, ["queued", "running"]))).all().length;
+          return (
+            <section className="mt-10 rounded-[14px] bg-sheet p-5 ring-1 ring-line">
+              <AutoRefresh active={redoing > 0} ms={6000} />
+              <h2 className="font-bold">Fix this client’s content</h2>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <form action={adminRetryFailed}><Hidden /><SubmitButton className="btn btn-primary" pending="Queued" disabled={!failed}>Retry {failed} item{failed === 1 ? "" : "s"} that need attention</SubmitButton></form>
+                <form action={adminRedoImages}><Hidden /><SubmitButton className="btn btn-ghost" pending="Queued" disabled={!review || redoing > 0}>Redo {review} post image{review === 1 ? "" : "s"} (keeps captions)</SubmitButton></form>
+                {redoing > 0 && <span className="text-sm text-ink-2">Redoing images: {redoing} left…</span>}
+              </div>
+              <p className="mt-2 text-sm text-ink-3">Redo makes a new picture for each post waiting for approval (about ₹10 each) and stamps the logo again. Use it after fixing a logo or an image problem.</p>
+            </section>
+          );
+        })()}
 
         {veoConfigured() && (() => {
           const c = veoCompareResult(id);

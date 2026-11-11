@@ -262,6 +262,33 @@ async function cleanLogo(file: string): Promise<{ png: Buffer; brightness: numbe
   return { png: trimmed, brightness: sum / vis, lums: Uint8Array.from(lums) };
 }
 
+/**
+ * Makes a new image for a finished post and keeps its caption and copy (admin "Redo post images").
+ * Re-stamps the logo for free when the clean original is on disk; otherwise generates a new image.
+ */
+export async function redoPostImage(itemId: string) {
+  const item = db.select().from(schema.contentItems).where(eq(schema.contentItems.id, itemId)).get();
+  if (!item || item.type !== "post" || !item.copy) return;
+  const copy = JSON.parse(item.copy) as Record<string, unknown>;
+  const dir = `${item.customerId}/${item.planId}/${itemId}/v${item.revisionCount}`;
+  const { absPath } = await import("./storage");
+  const fs = await import("node:fs");
+  const rawRel = `${dir}/post-raw.png`;
+  let raw: Buffer;
+  if (fs.existsSync(absPath(rawRel))) raw = fs.readFileSync(absPath(rawRel));
+  else {
+    const img = await generateImage(String(copy.image_prompt), "4:5");
+    addCost(itemId, img.costUsd);
+    raw = img.png;
+    saveFile(rawRel, raw);
+  }
+  const final = await withLogo(raw, await brandLogo(item.customerId));
+  const stamp = Date.now(); // new file names so browsers don't show the old cached image
+  const rel = saveFile(`${dir}/post-${stamp}.png`, final);
+  const jpg = saveFile(`${dir}/post-${stamp}.jpg`, await sharp(final).jpeg({ quality: 90 }).toBuffer());
+  db.update(schema.contentItems).set({ mediaPath: jpg, thumbPath: rel, updatedAt: new Date() }).where(eq(schema.contentItems.id, itemId)).run();
+}
+
 export async function generateItem(itemId: string, step: StepFn = () => {}) {
   await makeItem(itemId, step);
   afterItemMade(itemId);
@@ -335,6 +362,7 @@ async function makeItem(itemId: string, step: StepFn = () => {}) {
     const img = await generateImage(String(copy.image_prompt), "4:5");
     addCost(itemId, img.costUsd);
     step("Adding the logo");
+    saveFile(`${dir}/post-raw.png`, img.png); // the clean image, so the logo can be re-stamped later at no AI cost
     const final = await withLogo(img.png, logo);
     const rel = saveFile(`${dir}/post.png`, final);
     const jpg = saveFile(`${dir}/post.jpg`, await sharp(final).jpeg({ quality: 90 }).toBuffer());

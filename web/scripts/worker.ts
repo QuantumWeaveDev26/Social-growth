@@ -5,7 +5,7 @@
 import os from "node:os";
 import crypto from "node:crypto";
 import { claimNext, finishJob, stepper, generationPaused, setGenerationPaused } from "../src/lib/jobs";
-import { compareWriters, buildBrandProfile, planMonth, generateItem, publishDue, syncConnections, syncFacebookSchedule } from "../src/lib/engine";
+import { compareWriters, buildBrandProfile, planMonth, generateItem, redoPostImage, publishDue, syncConnections, syncFacebookSchedule } from "../src/lib/engine";
 import { db, schema } from "../src/db";
 import { deliverNotification } from "../src/lib/notify";
 import { runDaily } from "../src/lib/cycle";
@@ -32,6 +32,7 @@ async function handle(job: NonNullable<ReturnType<typeof claimNext>>) {
     else if (job.type === "creator_study") await runCreatorStudy(p.creatorId);
     else if (job.type === "creator_synthesis") await runCreatorSynthesis();
     else if (job.type === "ai_check") await runAiCheck();
+    else if (job.type === "redo_image") await redoPostImage(p.itemId);
     finishJob(job.id);
     console.log(new Date().toISOString(), "done", job.type, job.id);
   } catch (e) {

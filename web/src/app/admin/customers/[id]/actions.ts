@@ -128,6 +128,16 @@ export async function adminVeoTest(fd: FormData) {
   back(id);
 }
 
+/** New images for every post waiting for approval; captions are kept (about ₹10 an image, free when the clean original exists). */
+export async function adminRedoImages(fd: FormData) {
+  await requireAdmin();
+  const id = String(fd.get("customerId"));
+  const posts = db.select({ id: schema.contentItems.id }).from(schema.contentItems)
+    .where(and(eq(schema.contentItems.customerId, id), eq(schema.contentItems.type, "post"), eq(schema.contentItems.status, "awaiting_approval"))).all();
+  for (const p of posts) enqueue("redo_image", { itemId: p.id }, { customerId: id });
+  back(id);
+}
+
 /** Films the same 8-second clip with Veo 3.1 Fast and Veo 3.1 Lite to compare quality (about ₹110 in total at 1080p). */
 export async function adminVeoCompare(fd: FormData) {
   await requireAdmin();
