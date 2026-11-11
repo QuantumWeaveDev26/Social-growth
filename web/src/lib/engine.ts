@@ -184,15 +184,82 @@ async function brandLogo(customerId: string) {
   return c?.logoPath && fs.existsSync(absPath(c.logoPath)) ? absPath(c.logoPath) : null;
 }
 
-async function withLogo(png: Buffer, logoFile: string | null) {
+/**
+ * Stamps the client's logo bottom-right. Many uploaded logos are JPGs or PNGs with a solid white (or light)
+ * background, which used to show up as a white box: the flat background is removed, empty edges are trimmed,
+ * and the logo gets a soft backing only when it would otherwise disappear into the photo.
+ */
+export async function withLogo(png: Buffer, logoFile: string | null) {
   if (!logoFile) return png;
-  const img = sharp(png);
-  const meta = await img.metadata();
-  const w = Math.round((meta.width || 1024) * 0.12);
-  const logo = await sharp(logoFile).resize({ width: w, withoutEnlargement: false }).png().toBuffer();
-  const lm = await sharp(logo).metadata();
-  const pad = Math.round((meta.width || 1024) * 0.035);
-  return img.composite([{ input: logo, left: (meta.width || 1024) - w - pad, top: (meta.height || 1024) - (lm.height || w) - pad }]).png().toBuffer();
+  try {
+    const img = sharp(png);
+    const meta = await img.metadata();
+    const W = meta.width || 1080, H = meta.height || 1350;
+    const logo = await cleanLogo(logoFile);
+    if (!logo) return png;
+    const box = Math.round(W * 0.13);
+    const fitted = await sharp(logo.png).resize({ width: box, height: box, fit: "inside", withoutEnlargement: false }).png().toBuffer();
+    const fm = await sharp(fitted).metadata();
+    const lw = fm.width || box, lh = fm.height || box;
+    const pad = Math.round(W * 0.035);
+    const left = W - lw - pad, top = H - lh - pad;
+    // how bright is the photo where the logo goes?
+    const corner = await sharp(png).extract({ left: Math.max(0, left), top: Math.max(0, top), width: Math.min(lw, W - Math.max(0, left)), height: Math.min(lh, H - Math.max(0, top)) }).stats();
+    const bg = (corner.channels[0].mean + corner.channels[1].mean + corner.channels[2].mean) / 3;
+    const layers: import("sharp").OverlayOptions[] = [];
+    // share of the logo that would blend into the photo here (e.g. dark lettering on a dark photo)
+    const blend = logo.lums.length ? logo.lums.filter((l) => Math.abs(l - bg) < 60).length / logo.lums.length : 0;
+    if (Math.abs(bg - logo.brightness) < 70 || blend > 0.03) {
+      // too little contrast: put a soft rounded backing behind the logo (dark for light logos, light for dark ones)
+      const p = Math.round(W * 0.012);
+      const fill = logo.brightness > 128 ? "rgba(0,0,0,0.42)" : "rgba(255,255,255,0.82)";
+      const r = Math.round(Math.min(lw, lh) * 0.18 + p);
+      layers.push({ input: Buffer.from(`<svg width="${lw + 2 * p}" height="${lh + 2 * p}"><rect width="100%" height="100%" rx="${r}" ry="${r}" fill="${fill}"/></svg>`), left: left - p, top: top - p });
+    }
+    layers.push({ input: fitted, left, top });
+    return await img.composite(layers).png().toBuffer();
+  } catch (e) {
+    console.error("logo stamp skipped:", e instanceof Error ? e.message : e);
+    return png;
+  }
+}
+
+/** Removes a flat light background from a logo, trims empty edges, and reports how bright the logo is. */
+async function cleanLogo(file: string): Promise<{ png: Buffer; brightness: number; lums: Uint8Array } | null> {
+  const { data, info } = await sharp(file).resize({ width: 600, height: 600, fit: "inside", withoutEnlargement: true }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const n = info.width * info.height;
+  let opaque = 0;
+  for (let i = 0; i < n; i++) if (data[i * 4 + 3] > 250) opaque++;
+  // no real transparency: treat the colour of the corners (usually white) as background and cut it out
+  let keyed: number[] | null = null;
+  if (opaque / n > 0.97) {
+    const at = (x: number, y: number) => { const i = (y * info.width + x) * 4; return [data[i], data[i + 1], data[i + 2]]; };
+    const cs = [at(0, 0), at(info.width - 1, 0), at(0, info.height - 1), at(info.width - 1, info.height - 1)];
+    const bgc = [0, 1, 2].map((c) => cs.reduce((a, p) => a + p[c], 0) / 4);
+    const flat = cs.every((p) => p.every((v, c) => Math.abs(v - bgc[c]) < 18));
+    if (flat) {
+      keyed = bgc;
+      for (let i = 0; i < n; i++) {
+        const d = Math.max(Math.abs(data[i * 4] - bgc[0]), Math.abs(data[i * 4 + 1] - bgc[1]), Math.abs(data[i * 4 + 2] - bgc[2]));
+        if (d < 28) data[i * 4 + 3] = 0;
+        else if (d < 60) data[i * 4 + 3] = Math.min(data[i * 4 + 3], Math.round(((d - 28) / 32) * 255)); // soft edge
+      }
+    }
+  }
+  // what's left: is there a logo at all, and how bright is it?
+  let vis = 0, sum = 0;
+  const lums: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const a = data[i * 4 + 3];
+    if (a > 40) { vis++; const l = data[i * 4] * 0.299 + data[i * 4 + 1] * 0.587 + data[i * 4 + 2] * 0.114; sum += l;
+      // ignore the leftover halo of the removed background when judging contrast
+      const halo = keyed && Math.max(Math.abs(data[i * 4] - keyed[0]), Math.abs(data[i * 4 + 1] - keyed[1]), Math.abs(data[i * 4 + 2] - keyed[2])) < 110;
+      if (a > 200 && !halo && i % 7 === 0) lums.push(l); }
+  }
+  if (vis / n < 0.01) return null; // empty or invisible logo: skip rather than stamp a blank square
+  const out = await sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } }).png().toBuffer();
+  const trimmed = await sharp(out).trim({ threshold: 1 }).png().toBuffer().catch(() => out);
+  return { png: trimmed, brightness: sum / vis, lums: Uint8Array.from(lums) };
 }
 
 export async function generateItem(itemId: string, step: StepFn = () => {}) {

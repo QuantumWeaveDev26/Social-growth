@@ -100,25 +100,30 @@ export async function generateImage(prompt: string, size: ImageSize = "1024x1024
 }
 
 async function rawImage(prompt: string, size: ImageSize): Promise<{ png: Buffer; costUsd: number }> {
-  // Google only (billed to the Google Cloud credit), never falling back to OpenAI: Gemini image first,
-  // then Imagen 4 while Google still serves it. OpenAI only if IMAGE_ENGINE=openai is set on purpose.
-  const { veoConfigured, imagenImage, geminiImage } = await import("./veo");
+  // Google only (billed to the Google Cloud credit), never falling back to OpenAI. Gemini 3.1 Flash Image first;
+  // when Google says "429 Resource exhausted" we wait and try again, then use gemini-2.5-flash-image, which has
+  // its own capacity. (Imagen 4 was switched off by Google, so it is no longer tried.)
+  // OpenAI only if IMAGE_ENGINE=openai is set on purpose.
+  const { veoConfigured, geminiImage, GEMINI_IMAGE_BACKUP_MODEL } = await import("./veo");
   if (process.env.IMAGE_ENGINE !== "openai" && veoConfigured()) {
-    const gAspect = size === "4:5" ? "4:5" : size === "1024x1536" ? "9:16" : size === "1536x1024" ? "16:9" : "1:1";
-    const iAspect = size === "4:5" ? "3:4" : gAspect === "4:5" ? "3:4" : gAspect;
+    const aspect = size === "4:5" ? "4:5" : size === "1024x1536" ? "9:16" : size === "1536x1024" ? "16:9" : "1:1";
     const safer = `${prompt}\n\nKeep it a clean, brand-safe commercial photo: focus on the product, place and atmosphere; any people are adults shown naturally and modestly; no logos of other brands, no text other than the requested headline.`;
+    const busy = (m: string) => /\b429\b|RESOURCE_EXHAUSTED|Resource (has been )?exhausted/i.test(m);
     const tries: Array<[string, () => Promise<{ png: Buffer; costUsd: number }>]> = [
-      ["gemini image", () => geminiImage(prompt, gAspect)],
-      ["gemini image (retry)", () => geminiImage(safer, gAspect)],
-      ["imagen", () => imagenImage(safer, iAspect)],
+      ["gemini image", () => geminiImage(prompt, aspect)],
+      ["gemini image (2nd try)", () => geminiImage(safer, aspect)],
+      ["gemini image backup model", () => geminiImage(safer, aspect, GEMINI_IMAGE_BACKUP_MODEL)],
+      ["gemini image (last try)", () => geminiImage(safer, aspect)],
     ];
     const errors: string[] = [];
-    for (const [label, run] of tries) {
+    for (let i = 0; i < tries.length; i++) {
+      const [label, run] = tries[i];
       try { return await run(); } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        errors.push(`${label}: ${msg.slice(0, 200)}`);
+        errors.push(`${label}: ${msg.slice(0, 160)}`);
         console.error(`${label} failed:`, msg.slice(0, 300));
-        await new Promise((r) => setTimeout(r, 2500));
+        // Google's rate limit clears with time: back off properly (with a little jitter) instead of hammering it
+        if (i < tries.length - 1) await new Promise((r) => setTimeout(r, (busy(msg) ? [20, 45, 90][i] ?? 90 : 3) * 1000 + Math.random() * 3000));
       }
     }
     throw new Error(`Google image generation failed. ${errors.join(" | ")}`.slice(0, 700));

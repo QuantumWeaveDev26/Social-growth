@@ -109,19 +109,37 @@ export const GEMINI_IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-
 const GEMINI_IMAGE_SIZE = process.env.GEMINI_IMAGE_SIZE || "2K";
 const GEMINI_IMAGE_PRICE = Number(process.env.GEMINI_IMAGE_PRICE || (GEMINI_IMAGE_SIZE === "1K" ? 0.0672 : GEMINI_IMAGE_SIZE === "4K" ? 0.151 : 0.1008));
 
-export async function geminiImage(prompt: string, aspect: "1:1" | "4:5" | "3:4" | "9:16" | "16:9") {
+// gemini-2.5-flash-image: backup model with its own capacity (GA until 15 Mar 2027), $0.039 per ~1MP image
+export const GEMINI_IMAGE_BACKUP_MODEL = process.env.GEMINI_IMAGE_BACKUP_MODEL || "gemini-2.5-flash-image";
+
+// One image request at a time per process: bursts (two items at once, four reel scenes in parallel)
+// trigger Google's "429 Resource exhausted".
+let imageQueue: Promise<unknown> = Promise.resolve();
+function oneAtATime<T>(fn: () => Promise<T>): Promise<T> {
+  const run = imageQueue.then(fn, fn);
+  imageQueue = run.catch(() => undefined);
+  return run;
+}
+
+export function geminiImage(prompt: string, aspect: "1:1" | "4:5" | "3:4" | "9:16" | "16:9", model = GEMINI_IMAGE_MODEL) {
+  return oneAtATime(() => geminiImageNow(prompt, aspect, model));
+}
+
+async function geminiImageNow(prompt: string, aspect: "1:1" | "4:5" | "3:4" | "9:16" | "16:9", model: string) {
   const k = sa();
   if (!k) throw new Error("Google image generation isn't configured (GOOGLE_SA_JSON_B64 missing)");
   const loc = process.env.GEMINI_LOCATION || "global";
   const host = loc === "global" ? "aiplatform.googleapis.com" : `${loc}-aiplatform.googleapis.com`;
-  const url = `https://${host}/v1/projects/${k.project_id}/locations/${loc}/publishers/google/models/${GEMINI_IMAGE_MODEL}:generateContent`;
+  const url = `https://${host}/v1/projects/${k.project_id}/locations/${loc}/publishers/google/models/${model}:generateContent`;
+  const backup = model === GEMINI_IMAGE_BACKUP_MODEL;
   const r = await call<{ candidates?: Array<{ content?: { parts?: Array<{ text?: string; inlineData?: { mimeType?: string; data?: string } }> }; finishReason?: string }> }>(url, {
     contents: [{ role: "user", parts: [{ text: prompt }] }],
-    generationConfig: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: aspect, imageSize: GEMINI_IMAGE_SIZE } },
+    // the 2.5 model has one output size, so it takes no imageSize
+    generationConfig: { responseModalities: ["IMAGE"], imageConfig: backup ? { aspectRatio: aspect } : { aspectRatio: aspect, imageSize: GEMINI_IMAGE_SIZE } },
   }, 180_000);
   const part = r.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data);
   if (!part?.inlineData?.data) throw new Error(`Gemini image returned no picture (${r.candidates?.[0]?.finishReason || "no candidates"})`);
-  return { png: Buffer.from(part.inlineData.data, "base64"), costUsd: GEMINI_IMAGE_PRICE };
+  return { png: Buffer.from(part.inlineData.data, "base64"), costUsd: backup ? Number(process.env.GEMINI_IMAGE_BACKUP_PRICE || 0.039) : GEMINI_IMAGE_PRICE };
 }
 
 /**
