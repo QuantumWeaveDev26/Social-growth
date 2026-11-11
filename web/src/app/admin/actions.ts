@@ -28,3 +28,13 @@ export async function toggleGeneration(fd: FormData) {
   setGenerationPaused(String(fd.get("pause")) === "1");
   revalidatePath("/admin", "layout");
 }
+
+/** Runs one Gemini text call and one image on the server (about ₹10) to confirm Google AI works. */
+export async function runAiCheckAction() {
+  await requireAdmin();
+  const { queueAiCheck } = await import("@/lib/aicheck");
+  const { enqueue } = await import("@/lib/jobs");
+  queueAiCheck();
+  enqueue("ai_check", {});
+  revalidatePath("/admin");
+}

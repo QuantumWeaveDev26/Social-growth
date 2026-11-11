@@ -4,9 +4,13 @@ import { db, schema } from "@/db";
 import { requireAdmin } from "@/lib/auth";
 import { fmtDateTime, fmtTime, inr } from "@/lib/format";
 import { generationPaused } from "@/lib/jobs";
+import { aiCheckResult } from "@/lib/aicheck";
+import { mediaUrl } from "@/lib/storage";
+import { AutoRefresh } from "@/components/AutoRefresh";
+import { SubmitButton } from "@/components/SubmitButton";
 import { getActivity } from "@/lib/activity";
 import { clientRows } from "@/lib/adminData";
-import { toggleGeneration } from "./actions";
+import { runAiCheckAction, toggleGeneration } from "./actions";
 import { AdminShell } from "./AdminShell";
 import { IssueChips } from "./ui";
 
@@ -63,6 +67,31 @@ export default async function AdminOverview() {
           <button className={`btn ${paused ? "btn-mint" : "btn-ghost"}`}>{paused ? "Resume generation" : "Pause all generation"}</button>
         </div>
       </form>
+
+      {(() => {
+        const c = aiCheckResult();
+        const busy = !!c && c.status !== "done";
+        const Row = ({ label, st }: { label: string; st?: { ok: boolean; model?: string; ms: number; detail: string; path?: string } }) => (
+          <div className="flex flex-wrap items-start gap-3 py-2">
+            <span className={`chip ${!st ? "bg-sheet text-ink-2 ring-1 ring-line" : st.ok ? "bg-mint-wash text-mint-deep" : "bg-red-wash text-red"}`}>{!st ? (busy ? "Checking…" : "Not run") : st.ok ? "Working" : "Failed"}</span>
+            <span className="min-w-0 flex-1 text-sm"><b>{label}</b>{st && <span className="text-ink-2"> · {st.model ? `${st.model} · ` : ""}{(st.ms / 1000).toFixed(1)}s · <span className="break-words">{st.detail}</span></span>}</span>
+            {st?.path && <img src={mediaUrl(st.path)!} alt="AI check image" className="h-24 w-auto rounded-[8px] ring-1 ring-line" />}
+          </div>
+        );
+        return (
+          <section className="mt-6 rounded-[14px] bg-sheet p-5 ring-1 ring-line">
+            <AutoRefresh active={busy} ms={4000} />
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="font-bold">AI check</h2>
+                <p className="mt-1 text-sm text-ink-2">Writes one headline and makes one image on the server with Google, about ₹10. Run it before a demo.{c?.at ? ` Last run ${new Date(c.at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}.` : ""}</p>
+              </div>
+              <form action={runAiCheckAction}><SubmitButton className="btn btn-primary" pending="Starting" disabled={busy}>{c ? "Run again" : "Run AI check"}</SubmitButton></form>
+            </div>
+            {c && <div className="mt-3 divide-y divide-line"><Row label="Writing (Gemini)" st={c.text} /><Row label="Image (Gemini image)" st={c.image} /></div>}
+          </section>
+        );
+      })()}
 
       <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <section>

@@ -34,20 +34,33 @@ const parseJson = <T,>(raw: string): T => {
   }
 };
 
-/** Chat that must return a JSON object. Gemini (Google credit) when TEXT_ENGINE=gemini, with OpenAI as automatic fallback. */
+/**
+ * Chat that must return a JSON object. Google Gemini (billed to the Google Cloud credit) whenever Google is
+ * configured. There is NO OpenAI fallback: a failed call is retried on Gemini (network blips, rate limits,
+ * an unfinished or unparseable reply). OpenAI is used only if TEXT_ENGINE=openai is set on purpose.
+ */
 export async function chatJson<T = Record<string, unknown>>(system: string, user: string, opts: { model?: string; engine?: "gemini" | "openai" } = {}): Promise<{ data: T; costUsd: number; engine: string }> {
-  const engine = opts.engine || (process.env.TEXT_ENGINE === "gemini" ? "gemini" : "openai");
-  if (engine === "gemini") {
+  const { veoConfigured } = await import("./veo");
+  const engine = opts.engine || (process.env.TEXT_ENGINE === "openai" || !veoConfigured() ? "openai" : "gemini");
+  if (engine === "openai") return { ...(await openaiJson<T>(system, user, opts)), engine: opts.model || process.env.AI_TEXT_MODEL || "gpt-5-mini" };
+  const { geminiJson, GEMINI_TEXT_MODEL } = await import("./veo");
+  let last: unknown;
+  let cost = 0;
+  for (let attempt = 1; attempt <= 4; attempt++) {
     try {
-      const { geminiJson, GEMINI_TEXT_MODEL } = await import("./veo");
       const g = await geminiJson(system, user);
-      return { data: parseJson<T>(g.text), costUsd: g.costUsd, engine: GEMINI_TEXT_MODEL };
+      cost += g.costUsd;
+      return { data: parseJson<T>(g.text), costUsd: cost, engine: GEMINI_TEXT_MODEL };
     } catch (e) {
-      if (opts.engine === "gemini") throw e;
-      console.error("gemini failed, falling back to openai:", e instanceof Error ? e.message : e);
+      last = e;
+      const msg = e instanceof Error ? e.message : String(e);
+      // a wrong key, missing permission or bad request won't fix itself by waiting
+      if (/\b(400|401|403|404)\b|PERMISSION_DENIED|UNAUTHENTICATED|isn't configured/i.test(msg) && !/429|RESOURCE_EXHAUSTED/i.test(msg)) break;
+      console.error(`gemini attempt ${attempt} failed:`, msg.slice(0, 300));
+      if (attempt < 4) await new Promise((r) => setTimeout(r, 4000 * attempt * attempt));
     }
   }
-  return { ...(await openaiJson<T>(system, user, opts)), engine: opts.model || process.env.AI_TEXT_MODEL || "gpt-5-mini" };
+  throw new Error(`Gemini writing failed: ${last instanceof Error ? last.message : String(last)}`.slice(0, 600));
 }
 
 async function openaiJson<T>(system: string, user: string, opts: { model?: string } = {}): Promise<{ data: T; costUsd: number }> {
@@ -87,10 +100,28 @@ export async function generateImage(prompt: string, size: ImageSize = "1024x1024
 }
 
 async function rawImage(prompt: string, size: ImageSize): Promise<{ png: Buffer; costUsd: number }> {
-  // Google Imagen (billed to Google Cloud credit) whenever it's configured; OpenAI only if IMAGE_ENGINE=openai
-  const { veoConfigured, imagenImage } = await import("./veo");
+  // Google only (billed to the Google Cloud credit), never falling back to OpenAI: Gemini image first,
+  // then Imagen 4 while Google still serves it. OpenAI only if IMAGE_ENGINE=openai is set on purpose.
+  const { veoConfigured, imagenImage, geminiImage } = await import("./veo");
   if (process.env.IMAGE_ENGINE !== "openai" && veoConfigured()) {
-    return imagenImage(prompt, size === "4:5" ? "3:4" : size === "1024x1536" ? "9:16" : size === "1536x1024" ? "16:9" : "1:1");
+    const gAspect = size === "4:5" ? "4:5" : size === "1024x1536" ? "9:16" : size === "1536x1024" ? "16:9" : "1:1";
+    const iAspect = size === "4:5" ? "3:4" : gAspect === "4:5" ? "3:4" : gAspect;
+    const safer = `${prompt}\n\nKeep it a clean, brand-safe commercial photo: focus on the product, place and atmosphere; any people are adults shown naturally and modestly; no logos of other brands, no text other than the requested headline.`;
+    const tries: Array<[string, () => Promise<{ png: Buffer; costUsd: number }>]> = [
+      ["gemini image", () => geminiImage(prompt, gAspect)],
+      ["gemini image (retry)", () => geminiImage(safer, gAspect)],
+      ["imagen", () => imagenImage(safer, iAspect)],
+    ];
+    const errors: string[] = [];
+    for (const [label, run] of tries) {
+      try { return await run(); } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        errors.push(`${label}: ${msg.slice(0, 200)}`);
+        console.error(`${label} failed:`, msg.slice(0, 300));
+        await new Promise((r) => setTimeout(r, 2500));
+      }
+    }
+    throw new Error(`Google image generation failed. ${errors.join(" | ")}`.slice(0, 700));
   }
   const oaSize = size === "4:5" ? "1024x1536" : size;
   const r = await gateway<{ b64: string | null; error: unknown }>({ type: "image", prompt, size: oaSize, model: process.env.AI_IMAGE_MODEL || "gpt-image-1.5", quality: "high" });

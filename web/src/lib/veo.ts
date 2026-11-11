@@ -69,17 +69,17 @@ const base = (model = VEO_MODEL) => {
   return `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${k.project_id}/locations/${LOCATION}/publishers/google/models/${model}`;
 };
 
-async function call<T>(url: string, body: unknown): Promise<T> {
+async function call<T>(url: string, body: unknown, timeoutMs = 120_000): Promise<T> {
   const res = await fetch(url, {
     method: "POST",
     headers: { Authorization: `Bearer ${await accessToken()}`, "Content-Type": "application/json" },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(120_000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   const text = await res.text();
   let j: Record<string, unknown> = {};
   try { j = JSON.parse(text); } catch { /* keep raw text */ }
-  if (!res.ok) throw new Error(`Veo ${res.status}: ${((j.error as { message?: string })?.message || text).slice(0, 300)}`);
+  if (!res.ok) throw new Error(`Google ${res.status}: ${((j.error as { message?: string })?.message || text).slice(0, 300)}`);
   return j as T;
 }
 
@@ -99,6 +99,29 @@ export async function imagenImage(prompt: string, aspect: "1:1" | "3:4" | "4:3" 
   const p0 = r.predictions?.[0];
   if (!p0?.bytesBase64Encoded) throw new Error(`Imagen returned no image${p0?.raiFilteredReason ? `: ${p0.raiFilteredReason}` : " (blocked by safety filters)"}`);
   return { png: Buffer.from(p0.bytesBase64Encoded, "base64"), costUsd: IMAGEN_PRICE };
+}
+
+// ---------------------------------------------------------------- Gemini image (Nano Banana 2)
+// imagen-4.0-generate-001 is listed as discontinued from 30 Jun 2026; Google recommends Gemini image models.
+// gemini-3.1-flash-image: GA until May 2027+, global endpoint, native 4:5 and 9:16, $60 per 1M image tokens
+// (1,680 tokens = $0.1008 per 2K image).
+export const GEMINI_IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image";
+const GEMINI_IMAGE_SIZE = process.env.GEMINI_IMAGE_SIZE || "2K";
+const GEMINI_IMAGE_PRICE = Number(process.env.GEMINI_IMAGE_PRICE || (GEMINI_IMAGE_SIZE === "1K" ? 0.0672 : GEMINI_IMAGE_SIZE === "4K" ? 0.151 : 0.1008));
+
+export async function geminiImage(prompt: string, aspect: "1:1" | "4:5" | "3:4" | "9:16" | "16:9") {
+  const k = sa();
+  if (!k) throw new Error("Google image generation isn't configured (GOOGLE_SA_JSON_B64 missing)");
+  const loc = process.env.GEMINI_LOCATION || "global";
+  const host = loc === "global" ? "aiplatform.googleapis.com" : `${loc}-aiplatform.googleapis.com`;
+  const url = `https://${host}/v1/projects/${k.project_id}/locations/${loc}/publishers/google/models/${GEMINI_IMAGE_MODEL}:generateContent`;
+  const r = await call<{ candidates?: Array<{ content?: { parts?: Array<{ text?: string; inlineData?: { mimeType?: string; data?: string } }> }; finishReason?: string }> }>(url, {
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    generationConfig: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: aspect, imageSize: GEMINI_IMAGE_SIZE } },
+  }, 180_000);
+  const part = r.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data);
+  if (!part?.inlineData?.data) throw new Error(`Gemini image returned no picture (${r.candidates?.[0]?.finishReason || "no candidates"})`);
+  return { png: Buffer.from(part.inlineData.data, "base64"), costUsd: GEMINI_IMAGE_PRICE };
 }
 
 /**
@@ -220,10 +243,12 @@ export function veoTestResult(customerId: string) {
 }
 
 // ---------------------------------------------------------------- Gemini text (same Google Cloud project)
-export const GEMINI_TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || "gemini-2.5-flash";
+// gemini-2.5-flash was retired on 20 Oct 2026; gemini-3.8-flash is Google's listed replacement (GA until Sep 2027+)
+export const GEMINI_TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || "gemini-3.8-flash";
 /** List prices per 1M tokens for cost tracking (override with GEMINI_PRICE_IN / GEMINI_PRICE_OUT). */
-const G_IN = Number(process.env.GEMINI_PRICE_IN || 0.3);
-const G_OUT = Number(process.env.GEMINI_PRICE_OUT || 2.5);
+// gemini-3.8-flash list price per 1M tokens, global endpoint, from 1 Jan 2027 (introductory price until then is half)
+const G_IN = Number(process.env.GEMINI_PRICE_IN || 1.5);
+const G_OUT = Number(process.env.GEMINI_PRICE_OUT || 7.5);
 
 export async function geminiJson(system: string, user: string, model = GEMINI_TEXT_MODEL) {
   const k = sa();
@@ -234,10 +259,13 @@ export async function geminiJson(system: string, user: string, model = GEMINI_TE
   const r = await call<{ candidates?: Array<{ content?: { parts?: Array<{ text?: string }> }; finishReason?: string }>; usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; thoughtsTokenCount?: number } }>(url, {
     systemInstruction: { parts: [{ text: system }] },
     contents: [{ role: "user", parts: [{ text: user }] }],
-    generationConfig: { responseMimeType: "application/json", temperature: 0.8, maxOutputTokens: 16384 },
-  });
+    // month plans run up to ~46 items: leave plenty of room for the answer after the model's thinking
+    generationConfig: { responseMimeType: "application/json", temperature: 0.8, maxOutputTokens: Number(process.env.GEMINI_MAX_OUTPUT || 32768) },
+  }, 300_000);
+  const finish = r.candidates?.[0]?.finishReason;
   const text = r.candidates?.[0]?.content?.parts?.map((x) => x.text || "").join("") || "";
-  if (!text) throw new Error(`Gemini returned no text (${r.candidates?.[0]?.finishReason || "no candidates"})`);
+  if (finish === "MAX_TOKENS") throw new Error("Gemini ran out of room before finishing the answer (MAX_TOKENS)");
+  if (!text) throw new Error(`Gemini returned no text (${finish || "no candidates"})`);
   const u = r.usageMetadata || {};
   const costUsd = ((u.promptTokenCount || 0) * G_IN + ((u.candidatesTokenCount || 0) + (u.thoughtsTokenCount || 0)) * G_OUT) / 1e6;
   return { text, costUsd };

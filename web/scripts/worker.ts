@@ -11,6 +11,7 @@ import { deliverNotification } from "../src/lib/notify";
 import { runDaily } from "../src/lib/cycle";
 import { runVeoTest, runVeoCompare } from "../src/lib/veo";
 import { runCreatorStudy, runCreatorSynthesis } from "../src/lib/creators";
+import { runAiCheck } from "../src/lib/aicheck";
 import { eq } from "drizzle-orm";
 
 const CONCURRENCY = Number(process.env.WORKER_CONCURRENCY || 3);
@@ -30,6 +31,7 @@ async function handle(job: NonNullable<ReturnType<typeof claimNext>>) {
     else if (job.type === "writer_compare") await compareWriters(p.customerId);
     else if (job.type === "creator_study") await runCreatorStudy(p.creatorId);
     else if (job.type === "creator_synthesis") await runCreatorSynthesis();
+    else if (job.type === "ai_check") await runAiCheck();
     finishJob(job.id);
     console.log(new Date().toISOString(), "done", job.type, job.id);
   } catch (e) {
