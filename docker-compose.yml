@@ -35,6 +35,7 @@ x-app: &app
     VEO_LOCATION: ${VEO_LOCATION:-}
     VEO_RESOLUTION: ${VEO_RESOLUTION:-}
     REEL_VIDEO_ENGINE: ${REEL_VIDEO_ENGINE:-}
+    STUDIO_KEY: ${STUDIO_KEY:-}
     INSTAGRAM_APP_SECRET: ${INSTAGRAM_APP_SECRET:-}
   volumes:
     - brandmint-data:/data
