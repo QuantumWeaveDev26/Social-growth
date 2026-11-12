@@ -64,6 +64,26 @@ async function accessToken() {
   return cached.token;
 }
 
+/**
+ * Raw Vertex AI call for the internal content studio (/api/studio). Only Google model endpoints for Veo and
+ * Gemini/Imagen generation are allowed: "<model>:<method>".
+ */
+export async function vertexModelCall(target: string, body: unknown, location = LOCATION) {
+  const m = /^([a-z0-9.\-]{3,80}):(predictLongRunning|fetchPredictOperation|generateContent|predict)$/.exec(target);
+  if (!m) throw new Error("target not allowed");
+  if (!/^(global|us-central1|us-east4|europe-west4|asia-south1)$/.test(location)) throw new Error("location not allowed");
+  const k = sa();
+  if (!k) throw new Error("Google isn't configured");
+  const host = location === "global" ? "aiplatform.googleapis.com" : `${location}-aiplatform.googleapis.com`;
+  const res = await fetch(`https://${host}/v1/projects/${k.project_id}/locations/${location}/publishers/google/models/${target}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${await accessToken()}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body ?? {}),
+    signal: AbortSignal.timeout(280_000),
+  });
+  return { status: res.status, json: await res.json().catch(() => ({})) };
+}
+
 const base = (model = VEO_MODEL) => {
   const k = sa()!;
   return `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${k.project_id}/locations/${LOCATION}/publishers/google/models/${model}`;
