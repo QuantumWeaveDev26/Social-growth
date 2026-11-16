@@ -9,7 +9,7 @@ import { promisify } from "node:util";
 import sharp from "sharp";
 import { and, asc, desc, eq, inArray, lte, ne } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { chatJson, generateImage, textToSpeech, type Alignment } from "./ai";
+import { chatJson, generateImage, type Alignment } from "./ai";
 import { saveFile, absPath, STORAGE_ROOT } from "./storage";
 import { enqueue, type StepFn } from "./jobs";
 import { publishToMeta, platformsFor, MetaError, checkConnection, refreshInstagramToken, canScheduleOnFacebook, scheduleFacebookPost, facebookPostIsPublished, deleteFacebookPost, isPagePostId, FB_SCHEDULE_MIN_MS, FB_SCHEDULE_MAX_MS } from "./meta";
@@ -18,6 +18,7 @@ import { notify } from "./notify";
 import { monthLabel } from "./format";
 import { veoFor, imageToVideo, motionPrompt } from "./veo";
 import { knowledgeFor } from "./knowledge";
+import { ownerPhotos, photoLines, pickPhoto, photoFrame, photoPost, voiceover, musicBed } from "./standard";
 
 const run = promisify(execFile);
 const PB_DIR = path.join(process.cwd(), "src/playbooks/saas");
@@ -27,9 +28,12 @@ function latestProfile(customerId: string) {
   return db.select().from(schema.brandProfiles).where(eq(schema.brandProfiles.customerId, customerId)).orderBy(desc(schema.brandProfiles.version)).get();
 }
 
+/** The content standard learned from client work; every writing, planning and editing step reads it (remakes too). */
+const STANDARD_STEPS = new Set(["post", "reel", "editor", "month_plan"]);
 function sys(name: string, profileMd?: string) {
   const kb = knowledgeFor(name);
-  return (profileMd ? `=== BRAND PROFILE ===\n${profileMd}\n\n` : "") + (kb ? `${kb}\n\n` : "") + `=== PLAYBOOK (output format and hard rules; wins over the knowledge bank on format) ===\n${playbook(name)}`;
+  const std = STANDARD_STEPS.has(name) ? `${playbook("standard")}\n\n` : "";
+  return (profileMd ? `=== BRAND PROFILE ===\n${profileMd}\n\n` : "") + (kb ? `${kb}\n\n` : "") + std + `=== PLAYBOOK (output format and hard rules; wins over the knowledge bank on format) ===\n${playbook(name)}`;
 }
 
 /** Client facts every writing step must use (contact routes, products, style, past feedback). */
@@ -172,7 +176,12 @@ function checks(type: string, p: Record<string, unknown>) {
     const sc = (p.scenes as Array<Record<string, unknown>>) || [];
     if (sc.length !== 4) issues.push("reel needs exactly 4 scenes");
     if (sc.some((x) => wc(x.motion) < 12)) issues.push("every scene needs a specific motion direction (action, camera move, atmosphere, end frame)");
+    const beats = sc.map((x) => String(x.beat || "").toLowerCase());
+    if (beats.join(",") !== "problem,solution,outcome,cta") issues.push(`scene beats must be problem, solution, outcome, cta in that order (got: ${beats.join(", ") || "none"})`);
+    if (wc(p.cta_text) < 2) issues.push("cta_text is missing: one end-card line telling people what to do (using a supplied contact route)");
+    if (!String(p.music_mood || "").trim()) issues.push("music_mood is missing");
   }
+  if (type === "post" && wc(p.sub_text) < 3) issues.push("sub_text must give the solution and outcome in one line (3-12 words)");
   const all = [p.instagram_caption, p.facebook_post, p.vo_script].join(" ");
   if (/guarantee|100%|\bdelve\b|game-?changer|unlock|elevate|seamless/i.test(all)) issues.push("remove guarantee or AI-tell wording");
   if (/https?:\/\//i.test(all)) issues.push("remove links (none were supplied)");
@@ -335,7 +344,10 @@ async function makeItem(itemId: string, step: StepFn = () => {}) {
   const colours = c.brandColors || "[]";
   const prevCopy = item.copy ? `\nPREVIOUS VERSION (the customer asked for changes):\n${item.copy}` : "";
   const fb = feedback ? `\nCUSTOMER FEEDBACK (must be applied): ${feedback}` : "";
-  const user = `${businessFacts(c)}\n\nBRIEF:\n${item.brief}\nBRAND COLOURS: ${colours}${prevCopy}${fb}`;
+  const owner = await ownerPhotos(item.customerId);
+  addCost(itemId, owner.costUsd);
+  const photos = owner.photos;
+  const user = `${businessFacts(c)}\n${photoLines(photos)}\n\nBRIEF:\n${item.brief}\nBRAND COLOURS: ${colours}${prevCopy}${fb}`;
 
   step(feedback ? "Rewriting with the customer’s note" : "Writing the caption and copy");
   const draft = await chatJson<Record<string, unknown>>(sys(item.type === "reel" ? "reel" : "post", profile.profileMd), user);
@@ -358,8 +370,13 @@ async function makeItem(itemId: string, step: StepFn = () => {}) {
   const dir = `${item.customerId}/${item.planId}/${itemId}/v${item.revisionCount}`;
 
   if (item.type === "post") {
-    step("Creating the image");
-    const img = await generateImage(String(copy.image_prompt), "4:5");
+    const real = pickPhoto(photos, copy.photo);
+    step(real ? "Laying out the owner's photo" : "Creating the image");
+    const accent = (JSON.parse(colours) as string[])[0] || "#1F8A65";
+    const img = real
+      ? { png: await photoPost(real, String(copy.on_image_text || ""), String(copy.sub_text || ""), accent), costUsd: 0 }
+      : await generateImage(String(copy.image_prompt), "4:5");
+    if (real) copy.used_photo = real.path;
     addCost(itemId, img.costUsd);
     step("Adding the logo");
     saveFile(`${dir}/post-raw.png`, img.png); // the clean image, so the logo can be re-stamped later at no AI cost
@@ -376,18 +393,25 @@ async function makeItem(itemId: string, step: StepFn = () => {}) {
   // reel: 4 scene images + voiceover + Remotion render
   const scenes = (copy.scenes as Array<Record<string, string>>) || [];
   // all scene images at once, then all Veo clips at once (much faster than one by one)
-  step(`Creating ${scenes.length} scene images`);
-  const imgs = await Promise.all(scenes.map((sc) => generateImage(
+  const realPhotos = scenes.map((sc) => pickPhoto(photos, sc.photo));
+  step(`Creating ${scenes.length} scene images${realPhotos.some(Boolean) ? " (using the owner's photos where they fit)" : ""}`);
+  const imgs = await Promise.all(scenes.map(async (sc, i) => realPhotos[i] ? { png: await photoFrame(realPhotos[i]!, 1080, 1920), costUsd: 0 } : generateImage(
     `${sc.visual_prompt} A single vertical 9:16 photograph (one frame, not a collage or grid), photorealistic like a real documentary photo, natural light, real Indian setting, clear space at top and bottom, a calm settled moment where nothing is mid-action, any hands resting and natural with five fingers, no screen showing content, absolutely no text, letters or logos.`,
     "1024x1536",
   )));
+  copy.used_photos = realPhotos.map((p) => p?.path || null);
   const scenePaths = imgs.map((img, i) => { addCost(itemId, img.costUsd); return saveFile(`${dir}/scene${i + 1}.png`, img.png); });
   const clipPaths: (string | null)[] = scenePaths.map(() => null);
   // voice first: its timing decides how long each scene is on screen, so each clip can be filmed at that length
   step("Recording the voiceover");
-  const tts = await textToSpeech(String(copy.vo_script));
+  const tts = await voiceover(c, String(copy.vo_script));
   addCost(itemId, tts.costUsd);
-  const voice = saveFile(`${dir}/voice.mp3`, tts.mp3);
+  copy.voice_engine = tts.engine;
+  const voice = saveFile(`${dir}/voice.${tts.ext}`, tts.audio);
+  step("Composing the music");
+  const bed = await musicBed(String(copy.music_mood || ""));
+  if (bed) addCost(itemId, bed.costUsd);
+  const music = bed ? saveFile(`${dir}/music.wav`, bed.wav) : null;
   const timing = sceneTiming(scenes, tts.alignment);
   if (veoFor(item.customerId)) {
     const waited: number[] = scenePaths.map(() => 0);
@@ -395,6 +419,7 @@ async function makeItem(itemId: string, step: StepFn = () => {}) {
     const report = () => step(`Filming ${scenePaths.length} scenes with Veo (${done.filter(Boolean).length} done, ${Math.max(...waited)}s)`);
     report();
     await Promise.all(scenePaths.map(async (sp, i) => {
+      if (realPhotos[i]) { done[i] = true; return; } // real owner photo: kept still (slow push in the edit), never re-animated by AI
       try {
         const v = await imageToVideo(absPath(sp), motionPrompt(String(scenes[i].visual_prompt || ""), String(scenes[i].motion || "")), {
           seconds: timing.clipSec[i],
@@ -412,7 +437,7 @@ async function makeItem(itemId: string, step: StepFn = () => {}) {
   let mp4: string | null = null;
   try {
     step("Rendering the video");
-    mp4 = await renderReel({ dir, scenePaths, clipPaths, voice, alignment: tts.alignment, scenes, cover: String(copy.cover_text || ""), brand: c, logo });
+    mp4 = await renderReel({ dir, scenePaths, clipPaths, voice, music, alignment: tts.alignment, scenes, cover: String(copy.cover_text || ""), ctaText: String(copy.cta_text || ""), ctaRoute: String(copy.cta_route || ""), brand: c, logo });
   } catch (e) {
     copy.render_error = String(e).slice(0, 400);
   }
@@ -477,8 +502,8 @@ export function sceneTiming(scenes: Array<Record<string, string>>, alignment: Al
 }
 
 async function renderReel(o: {
-  dir: string; scenePaths: string[]; clipPaths?: (string | null)[]; voice: string; alignment: Alignment; scenes: Array<Record<string, string>>;
-  cover: string; brand: typeof schema.customers.$inferSelect; logo: string | null;
+  dir: string; scenePaths: string[]; clipPaths?: (string | null)[]; voice: string; music?: string | null; alignment: Alignment; scenes: Array<Record<string, string>>;
+  cover: string; ctaText?: string; ctaRoute?: string; brand: typeof schema.customers.$inferSelect; logo: string | null;
 }) {
   const videoDir = process.env.VIDEO_DIR || path.resolve(process.cwd(), "../video");
   const words = wordsFromAlignment(o.alignment);
@@ -493,11 +518,20 @@ async function renderReel(o: {
   fs.mkdirSync(jobPublic, { recursive: true });
   o.scenePaths.forEach((p, i) => fs.copyFileSync(absPath(p), path.join(jobPublic, `scene${i + 1}.png`)));
   o.clipPaths?.forEach((p, i) => { if (p) fs.copyFileSync(absPath(p), path.join(jobPublic, `scene${i + 1}.mp4`)); });
-  fs.copyFileSync(absPath(o.voice), path.join(jobPublic, "voice.mp3"));
+  const voiceName = `voice${path.extname(o.voice) || ".mp3"}`;
+  fs.copyFileSync(absPath(o.voice), path.join(jobPublic, voiceName));
+  if (o.music) fs.copyFileSync(absPath(o.music), path.join(jobPublic, "music.wav"));
+  const d = JSON.parse(o.brand.details || "{}") as Record<string, string>;
+  const route = (o.ctaRoute || "").toLowerCase();
+  const contact = route === "whatsapp" && d.whatsapp ? `WhatsApp ${d.whatsapp}` : route === "call" && d.phone ? `Call ${d.phone}` : route === "visit" && d.address ? String(d.address).split(",").slice(0, 2).join(",") : d.whatsapp ? `WhatsApp ${d.whatsapp}` : d.phone ? `Call ${d.phone}` : "";
   if (o.logo) fs.copyFileSync(o.logo, path.join(jobPublic, "logo.png"));
   const colours = JSON.parse(o.brand.brandColors || "[]") as string[];
   const props = {
-    audio: "job/voice.mp3",
+    audio: `job/${voiceName}`,
+    music: o.music ? "job/music.wav" : null,
+    ctaText: o.ctaText || "",
+    contact,
+    tapHint: route === "whatsapp" || route === "link",
     durationSec: words.length ? words[words.length - 1].end : 25,
     beats,
     captions: words.map((w, i) => ({ text: (i ? " " : "") + w.text, startMs: Math.round(w.start * 1000), endMs: Math.round(w.end * 1000), timestampMs: null, confidence: null })),

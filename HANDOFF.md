@@ -76,6 +76,15 @@ Customer pages: `/onboarding` (plan → business → brand kit → connect Meta 
 - Knowledge bank: Admin → Knowledge (stored in kv `kb:*`, never in git); fed into every writing step by src/lib/knowledge.ts. Source file kept privately by the owner.
 - Sign-up: industry (required), contact routes (≥1), content style, 10 languages. /app/business: products+prices, hours, links, show more/never show, up to 15 photos, completeness bar. Remake notes saved to details.feedback_notes and applied to all future content. Photos are stored and listed to the writer; using them as image/Veo reference frames is the next build.
 
+## 17 Nov: content standard (applies to every generation AND every remake/edit)
+Learned from the BriskFit and ATB client work; built into the automated pipeline so it can't be skipped.
+- `web/src/playbooks/saas/standard.md` is injected by `sys()` into the post, reel, editor and month_plan prompts (STANDARD_STEPS in engine.ts). Rules: problem → solution → outcome → ONE CTA; CTA from the business's own contact routes (WhatsApp when supplied and the goal is enquiries); facts only; real owner photos over AI people; no children; natural local voice; real-instrument music; no fake motion.
+- Playbooks: reel scenes carry `beat` = problem|solution|outcome|cta (+ `photo`, `cta_text`, `cta_route`, `music_mood`); posts: `on_image_text` = problem, `sub_text` = solution/outcome, optional `photo`; month plan items carry problem/solution/outcome. `checks()` flags wrong beat order, missing cta_text/music_mood/sub_text, so the editor fixes them.
+- `web/src/lib/standard.ts`: owner photos are described once by Gemini (cached in details.photo_notes, child photos flagged and never used) and listed to the writer by number; a reel scene with a photo uses the real photo (smart crop, no Veo); a post with a photo = the real photo + headline overlay (sharp/SVG, Noto Sans) instead of an AI image.
+- Voice: Gemini TTS (`GEMINI_TTS_MODEL`, default gemini-2.5-pro-tts; voices `GEMINI_VOICE_FEMALE`=Kore / `GEMINI_VOICE_MALE`=Orus, details.voice = "male" switches) sentence by sentence with an Indian-English style for Indian businesses (or the set language); ElevenLabs is the automatic fallback; `VOICE_ENGINE=elevenlabs` forces the old path.
+- Music: Lyria 2 (`LYRIA_MODEL`, us-central1) from the writer's `music_mood`, mixed at 0.17 with fades in ReelShort; `REEL_MUSIC=off` disables.
+- ReelShort end card: logo, cta_text, contact pill (WhatsApp/phone/address), "Tap the link below ↓" for click-to-WhatsApp; tail is now 3 s.
+
 ## Main website (on hold)
 
 The marketing page brandmintai.io/meta-growth (owner's other Hostinger account) still takes one-time payments and redirects to WhatsApp. It is deliberately NOT connected to the app yet. When it is, follow `docs/landing-page-integration.md`.

@@ -320,3 +320,49 @@ export async function geminiJson(system: string, user: string, model = GEMINI_TE
   const costUsd = ((u.promptTokenCount || 0) * G_IN + ((u.candidatesTokenCount || 0) + (u.thoughtsTokenCount || 0)) * G_OUT) / 1e6;
   return { text, costUsd };
 }
+
+// ---------------------------------------------------------------- content-standard helpers (photos, voice, music)
+function modelUrl(model: string, method: string, loc: string) {
+  const k = sa();
+  if (!k) throw new Error("Google AI isn't configured (GOOGLE_SA_JSON_B64 missing)");
+  const host = loc === "global" ? "aiplatform.googleapis.com" : `${loc}-aiplatform.googleapis.com`;
+  return `https://${host}/v1/projects/${k.project_id}/locations/${loc}/publishers/google/models/${model}:${method}`;
+}
+
+/** One line on what an owner photo shows, and whether a child is in it (children are never used in content). */
+export async function describePhoto(jpg: Buffer): Promise<{ desc: string; child: boolean; costUsd: number }> {
+  const r = await call<{ candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> }>(modelUrl(GEMINI_TEXT_MODEL, "generateContent", process.env.GEMINI_LOCATION || "global"), {
+    contents: [{ role: "user", parts: [
+      { text: 'Describe this business photo for a social-media writer in at most 16 words (what and where; e.g. "Coach feeding balls on an outdoor clay tennis court, morning"). Also say whether any person in it looks under 18. Reply JSON: {"desc": string, "has_child": boolean}' },
+      { inlineData: { mimeType: "image/jpeg", data: jpg.toString("base64") } },
+    ] }],
+    generationConfig: { responseMimeType: "application/json", temperature: 0.2, maxOutputTokens: 2048 },
+  }, 90_000);
+  const txt = r.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") || "{}";
+  let j: { desc?: string; has_child?: boolean } = {};
+  try { j = JSON.parse(txt); } catch { /* keep empty */ }
+  return { desc: String(j.desc || "").slice(0, 160), child: !!j.has_child, costUsd: 0.002 };
+}
+
+export const GEMINI_TTS_MODEL = process.env.GEMINI_TTS_MODEL || "gemini-2.5-pro-tts";
+/** One spoken sentence from Gemini TTS: raw 24 kHz mono 16-bit PCM. */
+export async function geminiSpeech(text: string, voice: string, style: string): Promise<Buffer> {
+  const r = await call<{ candidates?: Array<{ content?: { parts?: Array<{ inlineData?: { data?: string } }> } }> }>(modelUrl(GEMINI_TTS_MODEL, "generateContent", "global"), {
+    contents: [{ role: "user", parts: [{ text: `${style}: ${text}` }] }],
+    generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } } },
+  }, 120_000);
+  const data = r.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data)?.inlineData?.data;
+  if (!data) throw new Error("Gemini voice returned no audio");
+  return Buffer.from(data, "base64");
+}
+
+/** ~30 s instrumental from Lyria 2 (WAV). Real instruments, no vocals. */
+export async function lyriaMusic(prompt: string): Promise<Buffer> {
+  const r = await call<{ predictions?: Array<{ bytesBase64Encoded?: string }> }>(modelUrl(process.env.LYRIA_MODEL || "lyria-002", "predict", "us-central1"), {
+    instances: [{ prompt: `${prompt}. Polished commercial mix, real instruments, no vocals.`, negative_prompt: "vocals, singing, chiptune, video game, 8-bit, arcade, cartoon, harsh synth, distortion, lo-fi noise" }],
+    parameters: { sample_count: 1 },
+  }, 180_000);
+  const b = r.predictions?.[0]?.bytesBase64Encoded;
+  if (!b) throw new Error("Lyria returned no music");
+  return Buffer.from(b, "base64");
+}

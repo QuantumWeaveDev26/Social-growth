@@ -26,7 +26,7 @@ const bmMetadata: CalculateMetadataFunction<BrandMintProps> = ({ props }) => {
   return { durationInFrames: Math.ceil((props.durationSec + 1.8) * FPS) };
 };
 
-const reelMetadata: CalculateMetadataFunction<ReelShortProps> = ({ props }) => ({ durationInFrames: Math.ceil((props.durationSec + 2) * FPS) });
+const reelMetadata: CalculateMetadataFunction<ReelShortProps> = ({ props }) => ({ durationInFrames: Math.ceil((props.durationSec + 3) * FPS) });
 
 export const MyComposition = () => {
   return (
