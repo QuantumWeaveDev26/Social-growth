@@ -14,6 +14,7 @@ import { adminChangePlan, adminExtend, adminSetStatus, adminRetryFailed, adminRe
 import { veoCompareResult, veoConfigured, veoFor, veoTestResult } from "@/lib/veo";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { generationPaused, generationAllowList } from "@/lib/jobs";
+import { BusinessConnect, ReadyContent } from "./ReadyContent";
 
 export const metadata = { title: "Customer" };
 export const dynamic = "force-dynamic";
@@ -93,6 +94,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                 {conn.lastError && <p className="text-red">{conn.lastError}</p>}
               </div>
             ) : <p className="mt-2 text-sm text-ink-2">Not connected.</p>}
+            <BusinessConnect customerId={id} connectedPageId={conn?.metaUserId === "business_manager" ? conn.pageId : null} />
             <h2 className="mt-5 font-bold">Business</h2>
             <p className="mt-1 line-clamp-4 text-sm text-ink-2">{details.offer || "—"}</p>
             <form action={adminRebuildProfile} className="mt-3"><Hidden /><SubmitButton className="btn btn-ghost" pending="Queued">Rewrite brand profile</SubmitButton></form>
@@ -129,6 +131,8 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
             })()}
           </section>
         </div>
+
+        <ReadyContent customerId={id} connected={conn?.status === "connected" && conn.mode === "live"} postingTimes={JSON.parse(c.postingTimes || '["10:00","18:30"]')} />
 
         {(() => {
           const rows = db.select({ status: schema.contentItems.status, type: schema.contentItems.type }).from(schema.contentItems).where(eq(schema.contentItems.customerId, id)).all();

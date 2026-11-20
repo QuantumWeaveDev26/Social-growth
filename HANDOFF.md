@@ -76,6 +76,22 @@ Customer pages: `/onboarding` (plan → business → brand kit → connect Meta 
 - Knowledge bank: Admin → Knowledge (stored in kv `kb:*`, never in git); fed into every writing step by src/lib/knowledge.ts. Source file kept privately by the owner.
 - Sign-up: industry (required), contact routes (≥1), content style, 10 languages. /app/business: products+prices, hours, links, show more/never show, up to 15 photos, completeness bar. Remake notes saved to details.feedback_notes and applied to all future content. Photos are stored and listed to the writer; using them as image/Veo reference frames is the next build.
 
+## Managed clients: partner-access connect + ready-made content (20 Nov)
+For agency clients (e.g. ATB, BriskFit) whose content is already made and whose Page + Instagram we manage
+through partner access in Meta Business Suite. No Facebook Login and no App Review needed.
+- Admin → Clients → "Add a managed client" (no sign-up, no plan; the generator never touches it).
+- Client page → Facebook and Instagram → "Connect through Business Manager": lists every Page assigned to our
+  system user (with its linked Instagram) and stores that Page's token (never expires).
+  Needs `META_SYSTEM_USER_TOKEN` on the server (Business Settings → Users → System users → Generate token for
+  our app with pages_show_list, pages_read_engagement, pages_manage_posts, instagram_basic,
+  instagram_content_publish, business_management; expiry "Never"). Assign each client Page + IG account to the
+  system user. Keep the Meta app in Live mode, or posts are only visible to app roles.
+- Client page → "Ready-made content": upload images (posts) and .mp4s (reels); they are laid out on the
+  posting times from a start date (file-name order), captions + time editable per item, "Save and schedule" /
+  "Schedule all drafts with captions". Items use planId `ready`, status `ready_draft` → `approved`; the normal
+  worker publishes them to Facebook + Instagram at their time, and image posts also go on Meta's own scheduler.
+  Images are converted to JPEG on upload (Instagram's API only accepts JPEG).
+
 ## Main website (on hold)
 
 The marketing page brandmintai.io/meta-growth (owner's other Hostinger account) still takes one-time payments and redirects to WhatsApp. It is deliberately NOT connected to the app yet. When it is, follow `docs/landing-page-integration.md`.

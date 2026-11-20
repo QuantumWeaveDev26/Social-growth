@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireAdmin } from "@/lib/auth";
@@ -37,4 +38,15 @@ export async function runAiCheckAction() {
   queueAiCheck();
   enqueue("ai_check", {});
   revalidatePath("/admin");
+}
+
+/** Adds a client the team manages directly (no sign-up, no subscription): e.g. agency clients whose
+ * ready-made content we only schedule. Returns to the new client's page. */
+export async function adminCreateClient(fd: FormData) {
+  await requireAdmin();
+  const name = String(fd.get("name") || "").trim().slice(0, 120);
+  if (!name) return;
+  const c = db.insert(schema.customers).values({ businessName: name, status: "active", onboardStep: 99, postingTimes: JSON.stringify(["10:00", "18:30"]) }).returning().get();
+  revalidatePath("/admin", "layout");
+  redirect(`/admin/customers/${c.id}`);
 }
