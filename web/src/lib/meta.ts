@@ -74,6 +74,27 @@ export async function completeFacebookLogin(code: string): Promise<{ metaUserId:
   return { metaUserId: me.id, pages };
 }
 
+// ---------------------------------------------------------------- Business Manager (agency) connection
+// For clients who gave us partner access to their Page + Instagram in Meta Business Suite. A system user in
+// our Business portfolio, assigned to those assets, has a token that never expires. Its Page tokens post
+// to the client's Page and linked Instagram without the client ever logging in (no Facebook Login needed).
+export const systemUserToken = () => (process.env.META_SYSTEM_USER_TOKEN || "").trim();
+export const businessConnectLive = () => Boolean(systemUserToken());
+
+/** Every Page the system user is assigned to, with a Page token and the linked Instagram account. */
+export async function systemUserPages(): Promise<FbPage[]> {
+  const token = systemUserToken();
+  if (!token) return [];
+  const pages: FbPage[] = [];
+  let next: string | undefined = `${FB_GRAPH()}/me/accounts?fields=id,name,access_token,instagram_business_account{id,username}&limit=100&access_token=${encodeURIComponent(token)}`;
+  while (next) {
+    const r: { data: Array<{ id: string; name: string; access_token: string; instagram_business_account?: { id: string; username?: string } }>; paging?: { next?: string } } = await g(next);
+    for (const p of r.data) pages.push({ id: p.id, name: p.name, token: p.access_token, igId: p.instagram_business_account?.id ?? null, igUsername: p.instagram_business_account?.username ?? null });
+    next = r.paging?.next;
+  }
+  return pages;
+}
+
 // ---------------------------------------------------------------- Instagram Login (Instagram-only accounts)
 export const igRedirect = () => `${appUrl()}/api/meta/instagram/callback`;
 

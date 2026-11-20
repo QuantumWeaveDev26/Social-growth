@@ -1,0 +1,132 @@
+import { and, asc, eq } from "drizzle-orm";
+import { db, schema } from "@/db";
+import { SubmitButton } from "@/components/SubmitButton";
+import { mediaUrl } from "@/lib/storage";
+import { fmtDateTime } from "@/lib/format";
+import { READY_PLAN, istParts } from "@/lib/ready";
+import { businessConnectLive, systemUserPages, MetaError } from "@/lib/meta";
+import { adminReadyUpload, adminReadySave, adminReadyUnschedule, adminReadyDelete, adminReadyScheduleAll, adminConnectBusinessPage, adminDisconnectMeta } from "./ready";
+
+const STATUS: Record<string, { label: string; cls: string }> = {
+  ready_draft: { label: "Draft", cls: "bg-paper text-ink-2 ring-1 ring-line" },
+  approved: { label: "Scheduled", cls: "bg-mint-wash text-mint-deep" },
+  scheduled: { label: "Scheduled", cls: "bg-mint-wash text-mint-deep" },
+  published: { label: "Posted", cls: "bg-ink text-white" },
+  failed: { label: "Failed", cls: "bg-red-wash text-red" },
+};
+
+/** Connect a client's Page through our Business Manager system user (partner access). */
+export async function BusinessConnect({ customerId, connectedPageId }: { customerId: string; connectedPageId?: string | null }) {
+  const Hidden = () => <input type="hidden" name="customerId" value={customerId} />;
+  if (!businessConnectLive()) {
+    return <p className="mt-3 text-xs text-ink-3">To connect Pages you manage through partner access, set <code>META_SYSTEM_USER_TOKEN</code> on the server.</p>;
+  }
+  let pages: Awaited<ReturnType<typeof systemUserPages>> = [];
+  let err = "";
+  try { pages = await systemUserPages(); } catch (e) { err = e instanceof MetaError ? e.message : String(e); }
+  return (
+    <div className="mt-4 border-t border-line pt-4">
+      <p className="text-sm font-semibold">Connect through Business Manager</p>
+      {err ? <p className="mt-1 text-sm text-red">Couldn’t list Pages: {err}</p>
+        : !pages.length ? <p className="mt-1 text-sm text-ink-2">No Pages are assigned to the system user yet.</p>
+        : (
+          <form action={adminConnectBusinessPage} className="mt-2 flex flex-wrap gap-2"><Hidden />
+            <select name="pageId" defaultValue={connectedPageId ?? undefined} className="field min-w-0 flex-1 py-1.5">
+              {pages.map((p) => <option key={p.id} value={p.id}>{p.name}{p.igUsername ? ` · @${p.igUsername}` : " · no Instagram linked"}</option>)}
+            </select>
+            <SubmitButton className="btn btn-ghost" pending="Connecting">{connectedPageId ? "Switch" : "Connect"}</SubmitButton>
+          </form>
+        )}
+      {connectedPageId && (
+        <form action={adminDisconnectMeta} className="mt-2"><Hidden /><SubmitButton className="btn btn-ghost w-full" pending="Removing">Disconnect</SubmitButton></form>
+      )}
+    </div>
+  );
+}
+
+/** Upload ready-made posts/reels, set captions + times, schedule. The normal worker posts them. */
+export function ReadyContent({ customerId, connected, postingTimes }: { customerId: string; connected: boolean; postingTimes: string[] }) {
+  const items = db.select().from(schema.contentItems)
+    .where(and(eq(schema.contentItems.customerId, customerId), eq(schema.contentItems.planId, READY_PLAN)))
+    .orderBy(asc(schema.contentItems.slotAt)).all();
+  const drafts = items.filter((i) => i.status === "ready_draft").length;
+  const scheduled = items.filter((i) => ["approved", "scheduled"].includes(i.status)).length;
+  const posted = items.filter((i) => i.status === "published").length;
+  const today = istParts(new Date()).day;
+  const Hidden = () => <input type="hidden" name="customerId" value={customerId} />;
+
+  return (
+    <section className="mt-10 rounded-[14px] bg-sheet p-5 ring-1 ring-line">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="font-bold">Ready-made content</h2>
+          <p className="tnum mt-1 text-sm text-ink-2">Posts and reels made outside the generator. {drafts} draft · {scheduled} scheduled · {posted} posted. Times are India time.</p>
+        </div>
+        {drafts > 0 && (
+          <form action={adminReadyScheduleAll}><Hidden /><SubmitButton pending="Scheduling">Schedule all drafts with captions</SubmitButton></form>
+        )}
+      </div>
+      {!connected && <p className="mt-3 rounded-[10px] bg-amber-wash p-3 text-sm text-amber-deep">Facebook/Instagram isn’t connected for this client yet. Scheduled items wait and go out once it’s connected.</p>}
+
+      <form action={adminReadyUpload} className="mt-5 grid gap-3 rounded-[12px] bg-paper p-4 ring-1 ring-line md:grid-cols-[1.4fr_1fr_1fr_0.7fr]">
+        <Hidden />
+        <div className="md:col-span-4">
+          <label className="label" htmlFor="r-files">Files (images = posts, .mp4 = reels). They’re placed on the calendar in file-name order.</label>
+          <input id="r-files" name="files" type="file" multiple accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime" required className="field" />
+        </div>
+        <div><label className="label" htmlFor="r-cap">Caption for all (optional, edit each below)</label><input id="r-cap" name="caption" className="field" /></div>
+        <div><label className="label" htmlFor="r-day">Start date</label><input id="r-day" name="startDay" type="date" defaultValue={today} className="field" /></div>
+        <div><label className="label" htmlFor="r-times">Times each posting day</label><input id="r-times" name="times" defaultValue={postingTimes.join(", ")} className="field" /></div>
+        <div><label className="label" htmlFor="r-every">Every … days</label><input id="r-every" name="everyDays" type="number" min={1} max={14} defaultValue={1} className="field" /></div>
+        <div className="md:col-span-4"><SubmitButton pending="Uploading">Upload and place on calendar</SubmitButton></div>
+      </form>
+
+      {items.length > 0 && (
+        <div className="mt-6 space-y-4">
+          {items.map((it) => {
+            const copy = JSON.parse(it.copy || "{}");
+            const { day, time } = istParts(it.slotAt);
+            const st = STATUS[it.status] ?? { label: it.status, cls: "bg-paper text-ink-2" };
+            const locked = it.status === "published";
+            const url = mediaUrl(it.mediaPath)!;
+            return (
+              <div key={it.id} className="grid gap-4 rounded-[12px] p-4 ring-1 ring-line md:grid-cols-[160px_1fr]">
+                <div>
+                  {it.type === "reel" ? <video src={url} controls preload="metadata" className="aspect-[9/16] w-full rounded-[10px] bg-ink object-cover" />
+                    : <img src={url} alt="" className="w-full rounded-[10px]" />}
+                  <p className="mt-1 truncate text-xs text-ink-3" title={JSON.parse(it.brief || "{}").file}>{it.type === "reel" ? "Reel" : "Post"} · {JSON.parse(it.brief || "{}").file}</p>
+                </div>
+                <form action={adminReadySave} className="grid gap-3">
+                  <input type="hidden" name="itemId" value={it.id} />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${st.cls}`}>{st.label}</span>
+                    <span className="tnum text-sm text-ink-2">{fmtDateTime(it.slotAt)}</span>
+                    {it.error && <span className="text-sm text-red">{it.error}</span>}
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div><label className="label" htmlFor={`ig-${it.id}`}>Instagram caption</label><textarea id={`ig-${it.id}`} name="ig" rows={5} defaultValue={copy.instagram_caption || ""} disabled={locked} maxLength={2200} className="field" /></div>
+                    <div><label className="label" htmlFor={`fb-${it.id}`}>Facebook post (blank = same as Instagram)</label><textarea id={`fb-${it.id}`} name="fb" rows={5} defaultValue={copy.facebook_post && copy.facebook_post !== copy.instagram_caption ? copy.facebook_post : ""} disabled={locked} className="field" /></div>
+                  </div>
+                  {!locked && (
+                    <div className="flex flex-wrap items-end gap-2">
+                      <div><label className="label" htmlFor={`d-${it.id}`}>Date</label><input id={`d-${it.id}`} name="day" type="date" defaultValue={day} className="field py-1.5" /></div>
+                      <div><label className="label" htmlFor={`t-${it.id}`}>Time</label><input id={`t-${it.id}`} name="time" type="time" defaultValue={time} className="field py-1.5" /></div>
+                      <SubmitButton className="btn btn-ghost" pending="Saving">Save</SubmitButton>
+                      {it.status === "ready_draft" && <SubmitButton name="schedule" value="1" pending="Scheduling">Save and schedule</SubmitButton>}
+                    </div>
+                  )}
+                </form>
+                {!locked && (
+                  <div className="flex gap-2 md:col-start-2">
+                    {it.status !== "ready_draft" && <form action={adminReadyUnschedule}><input type="hidden" name="itemId" value={it.id} /><SubmitButton className="btn btn-ghost" pending="Saving">Unschedule</SubmitButton></form>}
+                    <form action={adminReadyDelete}><input type="hidden" name="itemId" value={it.id} /><SubmitButton className="btn btn-ghost" pending="Deleting">Delete</SubmitButton></form>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}

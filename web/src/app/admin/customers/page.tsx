@@ -5,7 +5,7 @@ import { fmtDateTime, fmtDay, inr } from "@/lib/format";
 import { clientRows, type ClientRow } from "@/lib/adminData";
 import { AdminShell } from "../AdminShell";
 import { IssueChips, MonthBar, MONTH_LEGEND } from "../ui";
-import { setCustomerStatus } from "../actions";
+import { setCustomerStatus, adminCreateClient } from "../actions";
 
 export const metadata = { title: "Clients" };
 export const dynamic = "force-dynamic";
@@ -94,6 +94,13 @@ export default async function Clients({ searchParams }: { searchParams: Promise<
           <button className="btn btn-ghost py-2">Apply</button>
         </form>
       </div>
+
+      <form action={adminCreateClient} className="mt-4 flex flex-wrap items-center gap-2 rounded-[12px] bg-sheet p-3 ring-1 ring-line">
+        <span className="text-sm font-semibold">Add a managed client</span>
+        <span className="text-sm text-ink-2">(no sign-up or plan: connect their Page through Business Manager and schedule ready-made content)</span>
+        <input name="name" required placeholder="Business name" className="field ml-auto w-full py-2 sm:w-64" aria-label="Business name" />
+        <button className="btn btn-ghost py-2">Add client</button>
+      </form>
 
       <div className="mt-4 overflow-x-auto rounded-[12px] bg-sheet ring-1 ring-line">
         <table className="tnum w-full min-w-[1100px] text-left text-[0.88rem]">
