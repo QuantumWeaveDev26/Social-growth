@@ -320,3 +320,21 @@ export async function geminiJson(system: string, user: string, model = GEMINI_TE
   const costUsd = ((u.promptTokenCount || 0) * G_IN + ((u.candidatesTokenCount || 0) + (u.thoughtsTokenCount || 0)) * G_OUT) / 1e6;
   return { text, costUsd };
 }
+
+/** Gemini with images (inline JPEG/PNG parts) that must answer in JSON. */
+export async function geminiJsonParts(system: string, parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }>, model = GEMINI_TEXT_MODEL) {
+  const k = sa();
+  if (!k) throw new Error("Gemini isn't configured (GOOGLE_SA_JSON_B64 missing)");
+  const loc = process.env.GEMINI_LOCATION || "global";
+  const host = loc === "global" ? "aiplatform.googleapis.com" : `${loc}-aiplatform.googleapis.com`;
+  const url = `https://${host}/v1/projects/${k.project_id}/locations/${loc}/publishers/google/models/${model}:generateContent`;
+  const r = await call<{ candidates?: Array<{ content?: { parts?: Array<{ text?: string }> }; finishReason?: string }>; usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; thoughtsTokenCount?: number } }>(url, {
+    systemInstruction: { parts: [{ text: system }] },
+    contents: [{ role: "user", parts }],
+    generationConfig: { responseMimeType: "application/json", temperature: 0.8, maxOutputTokens: 8192 },
+  }, 180_000);
+  const text = r.candidates?.[0]?.content?.parts?.map((x) => x.text || "").join("") || "";
+  if (!text) throw new Error(`Gemini returned no text (${r.candidates?.[0]?.finishReason || "no candidates"})`);
+  const u = r.usageMetadata || {};
+  return { text, costUsd: ((u.promptTokenCount || 0) * G_IN + ((u.candidatesTokenCount || 0) + (u.thoughtsTokenCount || 0)) * G_OUT) / 1e6 };
+}
