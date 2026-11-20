@@ -17,28 +17,11 @@ import { requireAdmin } from "@/lib/auth";
 import { saveFile } from "@/lib/storage";
 import { systemUserPages, deleteFacebookPost } from "@/lib/meta";
 import { seal } from "@/lib/crypto";
-import { READY_PLAN, istDate } from "@/lib/ready";
+import { READY_PLAN, istDate, slots, parseTimes } from "@/lib/ready";
 
 const back = (id: string) => revalidatePath(`/admin/customers/${id}`);
 const VIDEO = new Set([".mp4", ".mov", ".m4v"]);
 const IMAGE = new Set([".jpg", ".jpeg", ".png", ".webp"]);
-
-/** Spreads n items over the posting times, one slot each, starting at the first free slot after `from`. */
-function slots(n: number, startDay: string, times: string[], everyDays: number) {
-  const out: Date[] = [];
-  const earliest = Date.now() + 30 * 60_000;
-  let day = new Date(`${startDay}T00:00:00+05:30`);
-  if (isNaN(day.getTime())) day = new Date();
-  for (let guard = 0; out.length < n && guard < 400; guard++) {
-    const ymd = new Date(day.getTime() + 5.5 * 3600e3).toISOString().slice(0, 10);
-    for (const t of times) {
-      const d = istDate(ymd, t);
-      if (d && d.getTime() >= earliest && out.length < n) out.push(d);
-    }
-    day = new Date(day.getTime() + Math.max(1, everyDays) * 86400e3);
-  }
-  return out;
-}
 
 /** Uploads ready-made files and lays them out on the calendar as drafts. */
 export async function adminReadyUpload(fd: FormData) {
@@ -46,9 +29,9 @@ export async function adminReadyUpload(fd: FormData) {
   const customerId = String(fd.get("customerId"));
   const files = (fd.getAll("files") as File[]).filter((f) => f && f.size > 0).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
   if (!files.length) return;
-  const times = String(fd.get("times") || "10:00,18:30").split(/[,\s]+/).map((t) => t.trim()).filter((t) => /^\d{1,2}:\d{2}$/.test(t)).map((t) => t.padStart(5, "0")).sort();
-  const when = slots(files.length, String(fd.get("startDay") || ""), times.length ? times : ["10:00", "18:30"], Number(fd.get("everyDays") || 1));
+  const when = slots(files.length, String(fd.get("startDay") || ""), parseTimes(String(fd.get("times") || "")), Number(fd.get("everyDays") || 1));
   const caption = String(fd.get("caption") || "").trim();
+  const created: string[] = [];
   for (let i = 0; i < files.length; i++) {
     const f = files[i];
     const ext = path.extname(f.name).toLowerCase();
@@ -69,9 +52,11 @@ export async function adminReadyUpload(fd: FormData) {
       slotAt: when[i] ?? new Date(Date.now() + (i + 1) * 86400e3), pillar: "Ready-made",
       brief: JSON.stringify({ source: "upload", file: f.name }),
       copy: JSON.stringify({ instagram_caption: caption, facebook_post: caption }),
-      mediaPath: rel, status: "ready_draft",
+      mediaPath: rel, status: "ready_draft", error: caption ? null : "Waiting for captions…",
     }).run();
+    created.push(itemId);
   }
+  if (!caption && created.length) { const { writeReadyCopyAll } = await import("@/lib/readyCopy"); void writeReadyCopyAll(created); }
   back(customerId);
 }
 
@@ -170,5 +155,40 @@ export async function adminDisconnectMeta(fd: FormData) {
   await requireAdmin();
   const customerId = String(fd.get("customerId"));
   db.delete(schema.metaConnections).where(eq(schema.metaConnections.customerId, customerId)).run();
+  back(customerId);
+}
+
+// ---------------------------------------------------------------- AI captions
+/** Rewrites one item's captions + ad copy with AI (looks at the creative). */
+export async function adminReadyWriteCopy(fd: FormData) {
+  const item = await loadItem(fd);
+  const { writeReadyCopyAll } = await import("@/lib/readyCopy");
+  await writeReadyCopyAll([item.id]);
+  back(item.customerId);
+}
+
+/** Writes captions for every draft that has none yet (or all drafts with all=1). */
+export async function adminReadyWriteCopyAll(fd: FormData) {
+  await requireAdmin();
+  const customerId = String(fd.get("customerId"));
+  const all = String(fd.get("all") || "") === "1";
+  const drafts = db.select().from(schema.contentItems).where(and(eq(schema.contentItems.customerId, customerId), eq(schema.contentItems.planId, READY_PLAN), eq(schema.contentItems.status, "ready_draft"))).all()
+    .filter((d) => all || !String(JSON.parse(d.copy || "{}").instagram_caption || "").trim())
+    .filter((d) => !(/captions…/.test(d.error || "") && d.updatedAt.getTime() > Date.now() - 15 * 60_000)); // not ones already being written
+  for (const d of drafts) db.update(schema.contentItems).set({ error: "Waiting for captions…", updatedAt: new Date() }).where(eq(schema.contentItems.id, d.id)).run();
+  const { writeReadyCopyAll } = await import("@/lib/readyCopy");
+  void writeReadyCopyAll(drafts.map((d) => d.id));
+  back(customerId);
+}
+
+/** Saves facts the caption writer should use for this client (WhatsApp, website, location, offers…). */
+export async function adminSaveCaptionNotes(fd: FormData) {
+  await requireAdmin();
+  const customerId = String(fd.get("customerId"));
+  const c = db.select().from(schema.customers).where(eq(schema.customers.id, customerId)).get();
+  if (!c) return;
+  const d = JSON.parse(c.details || "{}");
+  d.caption_notes = String(fd.get("notes") || "").trim().slice(0, 3000);
+  db.update(schema.customers).set({ details: JSON.stringify(d) }).where(eq(schema.customers.id, customerId)).run();
   back(customerId);
 }

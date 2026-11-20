@@ -85,6 +85,37 @@ async function openaiJson<T>(system: string, user: string, opts: { model?: strin
   return { data, costUsd };
 }
 
+/**
+ * JSON answer from a model that can SEE images (JPEG buffers). Gemini when Google is configured, otherwise
+ * OpenAI through the gateway (image_url data URLs). Used to write captions for ready-made posts and reels.
+ */
+export async function visionJson<T = Record<string, unknown>>(system: string, user: string, images: Buffer[]): Promise<{ data: T; costUsd: number; engine: string }> {
+  const { veoConfigured, geminiJsonParts, GEMINI_TEXT_MODEL } = await import("./veo");
+  if (veoConfigured() && process.env.TEXT_ENGINE !== "openai") {
+    let last: unknown;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const g = await geminiJsonParts(system, [{ text: user }, ...images.map((b) => ({ inlineData: { mimeType: "image/jpeg", data: b.toString("base64") } }))]);
+        return { data: parseJson<T>(g.text), costUsd: g.costUsd, engine: GEMINI_TEXT_MODEL };
+      } catch (e) { last = e; await new Promise((r) => setTimeout(r, 4000 * attempt)); }
+    }
+    throw new Error(`Gemini captions failed: ${last instanceof Error ? last.message : String(last)}`.slice(0, 500));
+  }
+  const model = process.env.AI_TEXT_MODEL || "gpt-5-mini";
+  const request: Record<string, unknown> = {
+    model, response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: [{ type: "text", text: user }, ...images.map((b) => ({ type: "image_url", image_url: { url: `data:image/jpeg;base64,${b.toString("base64")}`, detail: "low" } }))] },
+    ],
+  };
+  if (/^(gpt-5|o\d)/.test(model)) request.max_completion_tokens = 16000;
+  const r = await gateway<{ content: string | null; usage: ChatUsage | null; error: unknown }>({ type: "chat", request });
+  if (!r.content) throw new Error("Model returned no content: " + JSON.stringify(r.error).slice(0, 300));
+  const u = r.usage || {};
+  return { data: parseJson<T>(r.content), costUsd: ((u.prompt_tokens || 0) * 0.25 + (u.completion_tokens || 0) * 2) / 1e6, engine: model };
+}
+
 export type ImageSize = "1024x1024" | "1024x1536" | "1536x1024" | "4:5";
 
 /**

@@ -145,6 +145,35 @@ export function platformsFor(conn: Conn): Array<"facebook" | "instagram"> {
 // ---------------------------------------------------------------- publishing
 type Item = typeof schema.contentItems.$inferSelect;
 
+/** Carousel slides (ready-made content) or the single media file. */
+export function slidesOf(item: Item): string[] {
+  try {
+    const b = JSON.parse(item.brief || "{}");
+    if (Array.isArray(b.slides) && b.slides.length > 1) return b.slides as string[];
+  } catch { /* single */ }
+  return item.mediaPath ? [item.mediaPath] : [];
+}
+
+/** Waits until an Instagram media container has finished processing. */
+async function igReady(host: string, id: string, token: string, what: string) {
+  for (let i = 0; i < 30; i++) {
+    const st = await g<{ status_code: string }>(`${host}/${id}?fields=status_code&access_token=${token}`);
+    if (st.status_code === "FINISHED") return;
+    if (st.status_code === "ERROR" || st.status_code === "EXPIRED") throw new MetaError(`Instagram couldn’t process the ${what} (${st.status_code})`);
+    await new Promise((r) => setTimeout(r, i < 3 ? 4000 : 10_000));
+  }
+}
+
+/** Uploads photos unpublished and returns attached_media params for a multi-photo feed post. */
+async function attachPhotos(conn: Conn, token: string, paths: string[]) {
+  const params: Record<string, string> = {};
+  for (const [i, p] of paths.entries()) {
+    const photo = await g<{ id: string }>(`${FB_GRAPH()}/${conn.pageId}/photos`, { method: "POST", body: new URLSearchParams({ url: `${appUrl()}/media/${p}`, published: "false", temporary: "true", access_token: token }) });
+    params[`attached_media[${i}]`] = JSON.stringify({ media_fbid: photo.id });
+  }
+  return params;
+}
+
 export async function publishToMeta(conn: Conn | undefined, item: Item, copy: Record<string, unknown>, platform: "facebook" | "instagram") {
   if (!conn) throw new MetaError("Facebook and Instagram are not connected");
   if (conn.status === "needs_reconnect") throw new MetaError("The connection needs to be renewed. Reconnect in Accounts.", 190);
@@ -162,6 +191,12 @@ export async function publishToMeta(conn: Conn | undefined, item: Item, copy: Re
       const r = await g<{ id: string }>(`${FB_GRAPH()}/${conn.pageId}/videos`, { method: "POST", body: new URLSearchParams({ file_url: media, description: message, access_token: token }) });
       return r.id;
     }
+    const slides = slidesOf(item);
+    if (slides.length > 1) {
+      const attached = await attachPhotos(conn, token, slides);
+      const r = await g<{ id: string }>(`${FB_GRAPH()}/${conn.pageId}/feed`, { method: "POST", body: new URLSearchParams({ message, ...attached, access_token: token }) });
+      return r.id;
+    }
     const r = await g<{ id: string; post_id?: string }>(`${FB_GRAPH()}/${conn.pageId}/photos`, { method: "POST", body: new URLSearchParams({ url: media, caption: message, access_token: token }) });
     return r.post_id || r.id;
   }
@@ -169,6 +204,19 @@ export async function publishToMeta(conn: Conn | undefined, item: Item, copy: Re
   if (!conn.igUserId) throw new MetaError("No Instagram professional account is linked to this Facebook Page");
   const host = conn.kind === "instagram" ? IG_GRAPH() : FB_GRAPH();
   const caption = String(copy.instagram_caption || "");
+  const slides = slidesOf(item);
+  if (!isReel && slides.length > 1) {
+    const children: string[] = [];
+    for (const p of slides.slice(0, 10)) {
+      const ch = await g<{ id: string }>(`${host}/${conn.igUserId}/media`, { method: "POST", body: new URLSearchParams({ image_url: `${appUrl()}/media/${p}`, is_carousel_item: "true", access_token: token }) });
+      await igReady(host, ch.id, token, "carousel image");
+      children.push(ch.id);
+    }
+    const box = await g<{ id: string }>(`${host}/${conn.igUserId}/media`, { method: "POST", body: new URLSearchParams({ media_type: "CAROUSEL", children: children.join(","), caption, access_token: token }) });
+    await igReady(host, box.id, token, "carousel");
+    const pub = await g<{ id: string }>(`${host}/${conn.igUserId}/media_publish`, { method: "POST", body: new URLSearchParams({ creation_id: box.id, access_token: token }) });
+    return pub.id;
+  }
   const params: Record<string, string> = isReel
     ? { media_type: "REELS", video_url: media, caption, share_to_feed: "true", access_token: token }
     : { image_url: media, caption, access_token: token };
@@ -203,15 +251,12 @@ export const canScheduleOnFacebook = (conn: Conn | undefined, item: Item) =>
  */
 export async function scheduleFacebookPost(conn: Conn, item: Item, copy: Record<string, unknown>) {
   const token = open(conn.pageToken)!;
-  const photo = await g<{ id: string }>(`${FB_GRAPH()}/${conn.pageId}/photos`, {
-    method: "POST",
-    body: new URLSearchParams({ url: `${appUrl()}/media/${item.mediaPath}`, published: "false", temporary: "true", access_token: token }),
-  });
+  const attached = await attachPhotos(conn, token, slidesOf(item));
   const post = await g<{ id: string }>(`${FB_GRAPH()}/${conn.pageId}/feed`, {
     method: "POST",
     body: new URLSearchParams({
       message: String(copy.facebook_post || ""),
-      "attached_media[0]": JSON.stringify({ media_fbid: photo.id }),
+      ...attached,
       published: "false", scheduled_publish_time: String(Math.floor(item.slotAt.getTime() / 1000)), access_token: token,
     }),
   });
