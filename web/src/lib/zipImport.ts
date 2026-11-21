@@ -13,7 +13,7 @@ import sharp from "sharp";
 import yauzl from "yauzl";
 import { db, schema } from "@/db";
 import { saveFile, STORAGE_ROOT } from "./storage";
-import { READY_PLAN, slots } from "./ready";
+import { READY_PLAN, slots, autoPlan, type Kind } from "./ready";
 
 const VIDEO = new Set([".mp4", ".mov", ".m4v"]);
 const IMAGE = new Set([".jpg", ".jpeg", ".png", ".webp"]);
@@ -75,11 +75,19 @@ function group(entries: Entry[]): Unit[] {
     .sort((a, b) => a.at - b.at).map((x) => x.u);
 }
 
-export async function importZip(customerId: string, zipFile: string, opts: { startDay: string; times: string[]; everyDays: number }) {
+export type ImportOpts = { startDay: string; mode: "auto" | "manual"; days: number; times: string[]; everyDays: number; autoSchedule: boolean };
+
+export async function importZip(customerId: string, zipFile: string, opts: ImportOpts) {
   const { entries, close } = await listZip(zipFile);
   try {
-    const units = group(entries);
-    const when = slots(units.length, opts.startDay, opts.times, opts.everyDays);
+    let units = group(entries);
+    let when: Date[];
+    if (opts.mode === "auto") {
+      const kinds: Kind[] = units.map((u) => (u.type === "reel" ? "reel" : u.files.length > 1 ? "carousel" : "post"));
+      const plan = autoPlan(kinds, opts.startDay, opts.days);
+      units = plan.order.map((i) => units[i]);
+      when = plan.order.map((i) => plan.when[i]);
+    } else when = slots(units.length, opts.startDay, opts.times, opts.everyDays);
     const ids: string[] = [];
     for (let i = 0; i < units.length; i++) {
       const u = units[i];
@@ -96,7 +104,7 @@ export async function importZip(customerId: string, zipFile: string, opts: { sta
       db.insert(schema.contentItems).values({
         id: itemId, customerId, planId: READY_PLAN, type: u.type,
         slotAt: when[i] ?? new Date(Date.now() + (i + 1) * 86400e3), pillar: "Ready-made",
-        brief: JSON.stringify({ source: "zip", file: u.files.length > 1 ? `${u.key} (${u.files.length} slides)` : u.files[0].base, ...(paths.length > 1 ? { slides: paths } : {}) }),
+        brief: JSON.stringify({ source: "zip", autoSchedule: opts.autoSchedule, file: u.files.length > 1 ? `${u.key} (${u.files.length} slides)` : u.files[0].base, ...(paths.length > 1 ? { slides: paths } : {}) }),
         copy: JSON.stringify({ instagram_caption: "", facebook_post: "" }),
         mediaPath: paths[0], status: "ready_draft", error: "Waiting for captions…",
       }).run();

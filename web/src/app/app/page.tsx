@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { Film, AlertTriangle, CheckCheck, Loader2, PencilLine } from "lucide-react";
 import { db, schema } from "@/db";
@@ -26,6 +27,8 @@ const groupOf = (s: string) =>
 export default async function ProofSheet({ searchParams }: { searchParams: Promise<{ month?: string; show?: string; approved?: string; welcome?: string; round?: string; round_error?: string }> }) {
   const { customer } = await requireCustomer();
   const sp = await searchParams;
+  const hasSub = db.select({ id: schema.subscriptions.id }).from(schema.subscriptions).where(eq(schema.subscriptions.customerId, customer.id)).get();
+  if (!hasSub && customer.status === "active") redirect("/app/schedule"); // managed client: their calendar is home
   const plans = db.select().from(schema.contentPlans).where(eq(schema.contentPlans.customerId, customer.id)).orderBy(asc(schema.contentPlans.month)).all();
   const planJob = db.select().from(schema.jobs)
     .where(and(eq(schema.jobs.customerId, customer.id), eq(schema.jobs.type, "plan_month"), inArray(schema.jobs.status, ["queued", "running"])))

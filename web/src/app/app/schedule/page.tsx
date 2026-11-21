@@ -4,6 +4,7 @@ import { CalendarClock, CalendarDays, Check, ExternalLink, Film, List } from "lu
 import { Calendar, type CalEntry } from "./Calendar";
 import { db, schema } from "@/db";
 import { requireCustomer } from "@/lib/auth";
+import { itemTitle } from "@/lib/ready";
 import { mediaUrl } from "@/lib/storage";
 import { fmtDay, fmtDateTime, fmtTime, istDayKey } from "@/lib/format";
 import { platformsFor, FB_SCHEDULE_MAX_MS } from "@/lib/meta";
@@ -15,10 +16,7 @@ type Item = typeof schema.contentItems.$inferSelect;
 type Job = typeof schema.publishJobs.$inferSelect;
 type Badge = { label: string; tone: "mint" | "plain" | "done"; href?: string };
 
-const titleOf = (it: Item) => {
-  const copy = it.copy ? JSON.parse(it.copy) : {};
-  return copy.on_image_text || copy.cover_text || JSON.parse(it.brief).topic || "Untitled";
-};
+const titleOf = (it: Item) => itemTitle(it.copy, it.brief);
 
 export default async function SchedulePage({ searchParams }: { searchParams: Promise<{ view?: string; month?: string }> }) {
   const { customer } = await requireCustomer();
@@ -34,6 +32,10 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
   const posted = db.select().from(schema.contentItems)
     .where(and(eq(schema.contentItems.customerId, customer.id), eq(schema.contentItems.status, "published"), gt(schema.contentItems.slotAt, new Date(now - 14 * 86400e3))))
     .orderBy(desc(schema.contentItems.slotAt)).all();
+  const managed = !db.select({ id: schema.subscriptions.id }).from(schema.subscriptions).where(eq(schema.subscriptions.customerId, customer.id)).get();
+  const preparing = db.select().from(schema.contentItems)
+    .where(and(eq(schema.contentItems.customerId, customer.id), eq(schema.contentItems.status, "ready_draft")))
+    .orderBy(asc(schema.contentItems.slotAt)).all();
   const waiting = db.select({ id: schema.contentItems.id }).from(schema.contentItems)
     .where(and(eq(schema.contentItems.customerId, customer.id), eq(schema.contentItems.status, "awaiting_approval"))).all().length;
 
@@ -92,7 +94,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
         <div>
           <h1 className="font-display text-[1.85rem] sm:text-[2.3rem] leading-none tracking-[-0.03em]" style={{ fontWeight: 800 }}>Schedule</h1>
           <p className="mt-3 max-w-[70ch] text-ink-2">
-            Everything you’ve approved, by day. Facebook image posts also appear in your Meta Business Suite under <span className="font-semibold text-ink">Scheduled</span>. Instagram doesn’t let outside apps add to its schedule, so BrandMint posts those at the time shown.
+            {managed ? "Everything the BrandMint team has scheduled for you, by day." : "Everything you’ve approved, by day."} Facebook image posts also appear in your Meta Business Suite under <span className="font-semibold text-ink">Scheduled</span>. Instagram doesn’t let outside apps add to its schedule, so BrandMint posts those at the time shown.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -108,12 +110,18 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
 
       {!conn && (
         <p className="mt-6 rounded-[12px] bg-amber-wash px-5 py-4 text-[0.95rem] text-amber-deep">
-          Facebook and Instagram aren’t connected yet, so nothing can post. <Link href="/app/settings" className="font-semibold underline">Connect them</Link>.
+          {managed ? "The BrandMint team is connecting your Facebook and Instagram. Posts go live once that’s done." : <>Facebook and Instagram aren’t connected yet, so nothing can post. <Link href="/app/settings" className="font-semibold underline">Connect them</Link>.</>}
         </p>
       )}
       {waiting > 0 && (
         <p className="mt-6 rounded-[12px] bg-sheet px-5 py-4 text-[0.95rem] text-ink-2 ring-1 ring-line">
           <span className="font-semibold text-ink">{waiting} {waiting === 1 ? "post is" : "posts are"} waiting for your OK</span> and won’t be scheduled until you approve {waiting === 1 ? "it" : "them"}. <Link href="/app?show=review" className="font-semibold text-ink underline">Review now</Link>
+        </p>
+      )}
+
+      {preparing.length > 0 && (
+        <p className="mt-6 rounded-[12px] bg-sheet px-5 py-4 text-[0.95rem] text-ink-2 ring-1 ring-line">
+          <span className="font-semibold text-ink">{preparing.length} more {preparing.length === 1 ? "post is" : "posts are"} being prepared</span> by the BrandMint team (captions and final checks) and will appear on the calendar once scheduled.
         </p>
       )}
 

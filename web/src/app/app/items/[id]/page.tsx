@@ -4,6 +4,7 @@ import { and, asc, desc, eq } from "drizzle-orm";
 import { ArrowLeft, ChevronLeft, ChevronRight, Film, Check, Heart, MessageCircle, Send, Bookmark, ThumbsUp, Share2, Loader2 } from "lucide-react";
 import { db, schema } from "@/db";
 import { requireCustomer } from "@/lib/auth";
+import { itemTitle } from "@/lib/ready";
 import { mediaUrl } from "@/lib/storage";
 import { fmtDateTime } from "@/lib/format";
 import { StatusChip, ApproveMark } from "@/components/ui";
@@ -85,7 +86,7 @@ export default async function ItemPage({ params, searchParams }: { params: Promi
     <main className="px-4 sm:px-8 lg:px-12 pb-20 pt-6 lg:pt-8">
       <AutoRefresh active={making || posting} />
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Link href="/app" className="flex items-center gap-1.5 text-sm font-medium text-ink-2 hover:text-ink"><ArrowLeft className="size-4" aria-hidden />Proof sheet</Link>
+        <Link href={sub ? "/app" : "/app/schedule"} className="flex items-center gap-1.5 text-sm font-medium text-ink-2 hover:text-ink"><ArrowLeft className="size-4" aria-hidden />{sub ? "Proof sheet" : "Schedule"}</Link>
         <div className="flex items-center gap-1 text-sm text-ink-2">
           <span className="tnum mr-2">{idx + 1} of {siblings.length}</span>
           {prev ? <Link href={`/app/items/${prev.id}`} className="btn btn-ghost px-2 py-1.5" aria-label="Previous item"><ChevronLeft className="size-4" /></Link> : <span className="btn btn-ghost px-2 py-1.5" aria-disabled="true"><ChevronLeft className="size-4" /></span>}
@@ -102,7 +103,7 @@ export default async function ItemPage({ params, searchParams }: { params: Promi
             {item.type === "reel" && <span className="chip bg-[#eef1ef] text-ink-2"><Film className="size-3" aria-hidden />Reel</span>}
             <span className="chip bg-[#eef1ef] text-ink-2">{item.pillar}</span>
           </div>
-          <h1 className="mt-4 font-display text-[2rem] leading-[1.1] tracking-[-0.025em]" style={{ fontWeight: 800 }}>{copy?.on_image_text || copy?.cover_text || brief.topic}</h1>
+          <h1 className="mt-4 font-display text-[2rem] leading-[1.1] tracking-[-0.025em]" style={{ fontWeight: 800 }}>{itemTitle(item.copy, item.brief)}</h1>
           <p className="tnum mt-2 text-ink-2">Goes live {fmtDateTime(item.slotAt)} on Instagram and Facebook</p>
 
           {sp.approved && sp.approved !== id && (

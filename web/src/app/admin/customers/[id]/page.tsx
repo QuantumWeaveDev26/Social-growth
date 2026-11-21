@@ -10,7 +10,7 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { daysLeft } from "@/lib/billing";
 import { currentMonth, nextMonth, fmtDateTime, inr, monthLabel } from "@/lib/format";
 import { mediaUrl } from "@/lib/storage";
-import { adminChangePlan, adminExtend, adminSetStatus, adminRetryFailed, adminReleaseHeld, adminPlanMonth, adminRebuildProfile, adminAttachOwner, adminAllowGeneration, adminSetVeo, adminVeoTest, adminVeoCompare, adminCompareWriters, adminRedoImages, adminRemakeReel } from "./actions";
+import { adminChangePlan, adminExtend, adminSetStatus, adminRetryFailed, adminReleaseHeld, adminPlanMonth, adminRebuildProfile, adminAttachOwner, adminSendLoginLink, adminAllowGeneration, adminSetVeo, adminVeoTest, adminVeoCompare, adminCompareWriters, adminRedoImages, adminRemakeReel } from "./actions";
 import { veoCompareResult, veoConfigured, veoFor, veoTestResult } from "@/lib/veo";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { generationPaused, generationAllowList } from "@/lib/jobs";
@@ -69,9 +69,27 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
             <p className="w-full text-sm text-amber-deep"><span className="font-semibold">This business has no login.</span> Add the owner’s email and we’ll email them a link to set a password. Their content and settings stay as they are.</p>
             <div><label className="label" htmlFor="o-name">Owner name</label><input id="o-name" name="name" className="field w-56" /></div>
             <div><label className="label" htmlFor="o-email">Owner email</label><input id="o-email" name="email" type="email" required className="field w-72" /></div>
-            <SubmitButton pending="Sending">Create login and email link</SubmitButton>
+            <SubmitButton pending="Sending">Create login and send link</SubmitButton>
           </form>
         )}
+
+        {owner && (() => {
+          const link = JSON.parse(c.details || "{}").login_link as { url: string; expiresAt: string } | undefined;
+          const live = link && new Date(link.expiresAt).getTime() > Date.now();
+          return (
+            <section className="mt-6 rounded-[14px] bg-sheet p-5 ring-1 ring-line">
+              <h2 className="font-bold">Client login</h2>
+              <p className="mt-1 text-sm text-ink-2">They sign in at <span className="font-medium text-ink">app.brandmintai.io/login</span> with <span className="font-medium text-ink">{owner.email}</span> and see their calendar: scheduled, live and being-prepared posts.</p>
+              <form action={adminSendLoginLink} className="mt-3"><Hidden /><SubmitButton className="btn btn-ghost" pending="Sending">{live ? "Make a new set-password link" : "Send set-password link"}</SubmitButton></form>
+              {live && (
+                <div className="mt-3">
+                  <p className="text-sm text-ink-2">Latest link (emailed to them; also share it on WhatsApp). Works once, until {fmtDateTime(new Date(link!.expiresAt))}:</p>
+                  <input readOnly value={link!.url} className="field mt-1 w-full font-mono text-xs" />
+                </div>
+              )}
+            </section>
+          );
+        })()}
 
         <div className="mt-8 grid grid-cols-1 gap-8 md:grid-cols-3">
           <section className="rounded-[14px] bg-sheet p-5 ring-1 ring-line">

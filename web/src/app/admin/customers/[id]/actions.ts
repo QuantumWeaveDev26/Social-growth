@@ -103,13 +103,33 @@ export async function adminAttachOwner(fd: FormData) {
   let userId = existing?.id;
   if (existing) db.update(schema.users).set({ customerId: id }).where(eq(schema.users.id, existing.id)).run();
   else userId = db.insert(schema.users).values({ email, name, customerId: id, passwordHash: await hashPassword(crypto.randomBytes(24).toString("hex")) }).returning().get().id;
+  sendLoginLink(id, userId!);
+  back(id);
+}
+
+/** Emails a fresh set-password link to this client's login, and keeps it on the customer page so we can share it on WhatsApp too. */
+function sendLoginLink(customerId: string, userId: string) {
   const token = crypto.randomBytes(32).toString("base64url");
-  db.insert(schema.passwordResets).values({ userId: userId!, tokenHash: crypto.createHash("sha256").update(token).digest("hex"), expiresAt: new Date(Date.now() + 72 * 3600e3) }).run();
+  const expiresAt = new Date(Date.now() + 72 * 3600e3);
+  db.insert(schema.passwordResets).values({ userId, tokenHash: crypto.createHash("sha256").update(token).digest("hex"), expiresAt }).run();
+  const c = db.select().from(schema.customers).where(eq(schema.customers.id, customerId)).get();
+  if (c) {
+    const d = JSON.parse(c.details || "{}");
+    d.login_link = { url: `${process.env.APP_URL || "http://localhost:3000"}/reset?token=${token}`, expiresAt: expiresAt.toISOString() };
+    db.update(schema.customers).set({ details: JSON.stringify(d) }).where(eq(schema.customers.id, customerId)).run();
+  }
   notify(null, {
     kind: "password_reset", email: true, link: `/reset?token=${token}`, cta: "Set my password",
     title: "Set a password for BrandMint AI",
-    body: "Your BrandMint AI account is ready for you. Choose a password to sign in. Everything you set up earlier is still there.\n\nThis link works for 3 days and only once.",
+    body: "Your BrandMint AI account is ready. Choose a password to sign in and see your content calendar: what is scheduled, what has gone live, and what is being prepared.\n\nThis link works for 3 days and only once.",
   }, userId);
+}
+
+export async function adminSendLoginLink(fd: FormData) {
+  await requireAdmin();
+  const id = String(fd.get("customerId"));
+  const owner = db.select().from(schema.users).where(eq(schema.users.customerId, id)).get();
+  if (owner) sendLoginLink(id, owner.id);
   back(id);
 }
 

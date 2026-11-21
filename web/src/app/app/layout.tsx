@@ -20,21 +20,22 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const unread = unreadCount(customer.id);
   const left = daysLeft(sub?.periodEnd);
   const conn = db.select().from(schema.metaConnections).where(eq(schema.metaConnections.customerId, customer.id)).get();
+  const managed = !sub && customer.status === "active"; // agency-managed client: we schedule their ready-made content
   const menu = (
     <>
       <div className="rounded-[12px] bg-rail-2 px-4 py-3.5">
         <p className="truncate font-semibold text-white">{customer.businessName}</p>
-        <p className="tnum mt-0.5 text-[0.8rem]">{plan ? `${plan.name} · ${planContents(plan)}` : "No plan"}</p>
+        <p className="tnum mt-0.5 text-[0.8rem]">{plan ? `${plan.name} · ${planContents(plan)}` : managed ? "Managed by BrandMint" : "No plan"}</p>
       </div>
       <nav className="mt-6 space-y-1" aria-label="Studio">
-        <NavLink href="/app" exact icon={<LayoutGrid className="size-[18px]" aria-hidden />}>Proof sheet</NavLink>
+        {!managed && <NavLink href="/app" exact icon={<LayoutGrid className="size-[18px]" aria-hidden />}>Proof sheet</NavLink>}
         <NavLink href="/app/schedule" icon={<CalendarClock className="size-[18px]" aria-hidden />}>Schedule</NavLink>
         <NavLink href="/app/activity" icon={<Activity className="size-[18px]" aria-hidden />}>Activity</NavLink>
         <NavLink href="/app/notifications" icon={<Bell className="size-[18px]" aria-hidden />} badge={unread}>Notifications</NavLink>
         <NavLink href="/app/brand" icon={<Fingerprint className="size-[18px]" aria-hidden />}>Brand profile</NavLink>
         <NavLink href="/app/business" icon={<Store className="size-[18px]" aria-hidden />}>Business details</NavLink>
         <NavLink href="/app/settings" icon={<Settings2 className="size-[18px]" aria-hidden />}>Connections</NavLink>
-        <NavLink href="/app/billing" icon={<Receipt className="size-[18px]" aria-hidden />}>Billing</NavLink>
+        {!managed && <NavLink href="/app/billing" icon={<Receipt className="size-[18px]" aria-hidden />}>Billing</NavLink>}
         <NavLink href="/app/account" icon={<UserRound className="size-[18px]" aria-hidden />}>Account</NavLink>
       </nav>
       <div className="mt-auto space-y-4 px-2 pt-8">
