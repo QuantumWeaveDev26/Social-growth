@@ -15,7 +15,10 @@ import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireAdmin } from "@/lib/auth";
 import { saveFile } from "@/lib/storage";
-import { systemUserPages, deleteFacebookPost } from "@/lib/meta";
+import { systemUserPages } from "@/lib/meta";
+import { pullFromMeta, undoRemake, replaceMedia, type RemakeMode } from "@/lib/readyRemake";
+import { enqueue } from "@/lib/jobs";
+import { notify } from "@/lib/notify";
 import { seal } from "@/lib/crypto";
 import { READY_PLAN, istDate, slots, parseTimes } from "@/lib/ready";
 
@@ -61,17 +64,6 @@ export async function adminReadyUpload(fd: FormData) {
 }
 
 
-/** Takes an item off Meta's own scheduler (Facebook image posts), so an edit or unschedule can't leave a stale post there. */
-async function pullFromMeta(itemId: string, customerId: string) {
-  const jobs = db.select().from(schema.publishJobs).where(and(eq(schema.publishJobs.itemId, itemId), eq(schema.publishJobs.status, "meta_scheduled"))).all();
-  if (!jobs.length) return;
-  const conn = db.select().from(schema.metaConnections).where(eq(schema.metaConnections.customerId, customerId)).get();
-  for (const j of jobs) {
-    try { if (conn && j.remoteId) await deleteFacebookPost(conn, j.remoteId); } catch (e) { console.error("pull from Meta schedule:", e instanceof Error ? e.message : e); continue; }
-    db.update(schema.publishJobs).set({ status: "cancelled" }).where(eq(schema.publishJobs.id, j.id)).run();
-  }
-}
-
 async function loadItem(fd: FormData) {
   await requireAdmin();
   const itemId = String(fd.get("itemId"));
@@ -93,6 +85,7 @@ export async function adminReadySave(fd: FormData) {
     if (!ig) error = "Add a caption before scheduling";
     else if (at.getTime() < Date.now() + 5 * 60_000) error = "Pick a time at least 5 minutes from now";
     else { status = "approved"; error = null; }
+    if (status === "approved") db.update(schema.contentItems).set({ pendingNote: null }).where(eq(schema.contentItems.id, item.id)).run();
   } else if (item.status === "ready_draft") error = null;
   const changed = JSON.stringify(copy) !== (item.copy || "{}") || at.getTime() !== item.slotAt.getTime();
   if (changed && item.status !== "ready_draft") await pullFromMeta(item.id, item.customerId); // the worker re-schedules it with the new caption/time
@@ -103,7 +96,7 @@ export async function adminReadySave(fd: FormData) {
 /** Takes a scheduled item back to draft (the worker also removes it from Meta's scheduler). */
 export async function adminReadyUnschedule(fd: FormData) {
   const item = await loadItem(fd);
-  if (item.status === "approved" || item.status === "scheduled" || item.status === "failed") {
+  if (["approved", "scheduled", "failed", "awaiting_approval"].includes(item.status)) {
     await pullFromMeta(item.id, item.customerId);
     db.update(schema.contentItems).set({ status: "ready_draft", error: null, updatedAt: new Date() }).where(eq(schema.contentItems.id, item.id)).run();
   }
@@ -126,6 +119,7 @@ export async function adminReadyScheduleAll(fd: FormData) {
   const drafts = db.select().from(schema.contentItems).where(and(eq(schema.contentItems.customerId, customerId), eq(schema.contentItems.planId, READY_PLAN), eq(schema.contentItems.status, "ready_draft"))).all();
   for (const d of drafts) {
     const ig = String(JSON.parse(d.copy || "{}").instagram_caption || "").trim();
+    if (d.pendingNote) continue; // the client asked for changes: handle it first
     const ok = ig && d.slotAt.getTime() >= Date.now() + 5 * 60_000;
     db.update(schema.contentItems).set(ok ? { status: "approved", error: null } : { error: ig ? "Time has passed: pick a new time" : "Add a caption before scheduling" }).where(eq(schema.contentItems.id, d.id)).run();
   }
@@ -163,7 +157,7 @@ export async function adminDisconnectMeta(fd: FormData) {
 export async function adminReadyWriteCopy(fd: FormData) {
   const item = await loadItem(fd);
   const { writeReadyCopyAll } = await import("@/lib/readyCopy");
-  await writeReadyCopyAll([item.id]);
+  await writeReadyCopyAll([item.id], String(fd.get("note") || "").trim().slice(0, 1000));
   back(item.customerId);
 }
 
@@ -191,4 +185,52 @@ export async function adminSaveCaptionNotes(fd: FormData) {
   d.caption_notes = String(fd.get("notes") || "").trim().slice(0, 3000);
   db.update(schema.customers).set({ details: JSON.stringify(d) }).where(eq(schema.customers.id, customerId)).run();
   back(customerId);
+}
+
+// ---------------------------------------------------------------- remakes + client review
+/** Queues a remake from the admin's prompt (Gemini image for posts/slides, Veo 3.1 for reels). Runs even while generation is paused. */
+export async function adminReadyRemake(fd: FormData) {
+  const item = await loadItem(fd);
+  const prompt = String(fd.get("prompt") || "").trim().slice(0, 2000);
+  if (prompt.length < 4 || item.status === "published") return back(item.customerId);
+  const mode = String(fd.get("mode") || "edit") as RemakeMode;
+  const opts = { prompt, mode, slide: Number(fd.get("slide") || 1), seconds: Number(fd.get("seconds") || 8), audio: fd.get("audio") === "1", logo: fd.get("logo") === "1", recaption: fd.get("recaption") === "1" };
+  if (item.status !== "ready_draft") await pullFromMeta(item.id, item.customerId);
+  db.update(schema.contentItems).set({ status: "ready_draft", error: mode.startsWith("video") ? "Remaking: filming with Veo (2–5 minutes)…" : "Remaking: new image (under a minute)…", updatedAt: new Date() }).where(eq(schema.contentItems.id, item.id)).run();
+  enqueue("ready_remake", { itemId: item.id, opts }, { customerId: item.customerId });
+  back(item.customerId);
+}
+
+export async function adminReadyUndo(fd: FormData) {
+  const item = await loadItem(fd);
+  if (item.status !== "published") undoRemake(item);
+  back(item.customerId);
+}
+
+/** Replaces the creative with uploaded files (a fixed version from the designer). */
+export async function adminReadyReplace(fd: FormData) {
+  const item = await loadItem(fd);
+  const files = (fd.getAll("files") as File[]).filter((f) => f && f.size > 0).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  if (!files.length || item.status === "published") return back(item.customerId);
+  if (item.status !== "ready_draft") await pullFromMeta(item.id, item.customerId);
+  await replaceMedia(item, files);
+  db.update(schema.contentItems).set({ status: "ready_draft", updatedAt: new Date() }).where(eq(schema.contentItems.id, item.id)).run();
+  back(item.customerId);
+}
+
+/** Sends this item to the client to approve. It posts only after they approve it. */
+export async function adminReadySendReview(fd: FormData) {
+  const item = await loadItem(fd);
+  const ig = String(JSON.parse(item.copy || "{}").instagram_caption || "").trim();
+  if (!ig) { db.update(schema.contentItems).set({ error: "Add a caption before sending for review" }).where(eq(schema.contentItems.id, item.id)).run(); return back(item.customerId); }
+  if (item.status !== "ready_draft") await pullFromMeta(item.id, item.customerId);
+  db.update(schema.contentItems).set({ status: "awaiting_approval", pendingNote: null, error: null, updatedAt: new Date() }).where(eq(schema.contentItems.id, item.id)).run();
+  const waiting = db.select({ id: schema.contentItems.id }).from(schema.contentItems).where(and(eq(schema.contentItems.customerId, item.customerId), eq(schema.contentItems.status, "awaiting_approval"))).all().length;
+  notify(item.customerId, {
+    // one email per half hour, however many posts are sent in that time
+    kind: "approvals_due", email: true, dedupeKey: `ready_review:${item.customerId}:${Math.floor(Date.now() / 1_800_000)}`, link: waiting > 1 ? "/app/schedule" : `/app/items/${item.id}`, cta: "Review",
+    title: waiting > 1 ? `${waiting} posts are waiting for your OK` : "A post is waiting for your OK",
+    body: `We’ve updated a post for you. Have a look and approve it, or tell us what to change.\n\nIt goes live only after you approve it.`,
+  });
+  back(item.customerId);
 }

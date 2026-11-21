@@ -42,7 +42,7 @@ RULES
 Return ONLY JSON: {"instagram_caption": "...(no hashtags inside)...", "facebook_post": "...", "hashtags": ["#..."], "alt_text": "...", "ad": {"primary_text": "...", "headline": "...", "description": "..."}}`;
 
 /** Remotion's bundled ffmpeg (the image ships it for the reel renderer). */
-function ffmpegPath() {
+export function ffmpegPath() {
   const roots = [path.resolve(process.cwd(), "../video/node_modules/@remotion"), "/app/video/node_modules/@remotion"];
   for (const r of roots) for (const v of ["compositor-linux-x64-gnu", "compositor-linux-x64-musl", "compositor-darwin-arm64", "compositor-darwin-x64"]) {
     const p = path.join(r, v, "ffmpeg");
@@ -84,7 +84,7 @@ export function itemMedia(item: Item): string[] {
 }
 
 /** Writes and saves the copy for one ready-made item. Returns the cost. */
-export async function writeReadyCopy(itemId: string): Promise<number> {
+export async function writeReadyCopy(itemId: string, note = ""): Promise<number> {
   const item = db.select().from(schema.contentItems).where(eq(schema.contentItems.id, itemId)).get();
   if (!item) return 0;
   const c = db.select().from(schema.customers).where(eq(schema.customers.id, item.customerId)).get()!;
@@ -98,6 +98,7 @@ export async function writeReadyCopy(itemId: string): Promise<number> {
     businessFacts(c),
     d.caption_notes ? `EXTRA FACTS FROM THE AGENCY (true, use them):\n${String(d.caption_notes)}` : "",
     profile?.profileMd ? `BRAND PROFILE:\n${profile.profileMd.slice(0, 4000)}` : "",
+    note ? `INSTRUCTION FROM THE AGENCY FOR THIS POST (follow it):\n${note}` : "",
     `The creative is ${kind} File name: ${JSON.parse(item.brief || "{}").file || ""}.`,
     "Write the copy now.",
   ].filter(Boolean).join("\n\n");
@@ -108,17 +109,17 @@ export async function writeReadyCopy(itemId: string): Promise<number> {
   const prev = JSON.parse(item.copy || "{}");
   const copy = { ...prev, instagram_caption: ig, facebook_post: String(x.facebook_post || "").trim() || ig, hashtags: tags, alt_text: String(x.alt_text || "").slice(0, 1000), ad: x.ad || null, written_by: r.engine };
   // batches uploaded with "schedule automatically" go live as soon as their words are written
-  const auto = JSON.parse(item.brief || "{}").autoSchedule === true && item.status === "ready_draft" && item.slotAt.getTime() > Date.now() + 5 * 60_000;
+  const auto = JSON.parse(item.brief || "{}").autoSchedule === true && item.status === "ready_draft" && !item.pendingNote && item.slotAt.getTime() > Date.now() + 5 * 60_000;
   db.update(schema.contentItems).set({ copy: JSON.stringify(copy), error: null, costUsd: (item.costUsd || 0) + r.costUsd, updatedAt: new Date(), ...(auto ? { status: "approved" } : {}) }).where(eq(schema.contentItems.id, item.id)).run();
   return r.costUsd;
 }
 
 /** Writes copy for several items one after another (background; errors land on the item). */
-export async function writeReadyCopyAll(ids: string[]) {
+export async function writeReadyCopyAll(ids: string[], note = "") {
   for (const id of ids) {
     try {
       db.update(schema.contentItems).set({ error: "Writing captions…", updatedAt: new Date() }).where(eq(schema.contentItems.id, id)).run();
-      await writeReadyCopy(id);
+      await writeReadyCopy(id, note);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error("ready copy:", msg);

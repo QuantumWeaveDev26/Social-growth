@@ -33,6 +33,7 @@ async function handle(job: NonNullable<ReturnType<typeof claimNext>>) {
     else if (job.type === "creator_synthesis") await runCreatorSynthesis();
     else if (job.type === "ai_check") await runAiCheck();
     else if (job.type === "redo_image") await redoPostImage(p.itemId);
+    else if (job.type === "ready_remake") { const { remakeReady } = await import("../src/lib/readyRemake"); await remakeReady(p.itemId, p.opts); }
     finishJob(job.id);
     console.log(new Date().toISOString(), "done", job.type, job.id);
   } catch (e) {
@@ -40,6 +41,12 @@ async function handle(job: NonNullable<ReturnType<typeof claimNext>>) {
     console.error(new Date().toISOString(), "error", job.type, msg);
     if (job.type === "generate_item" && job.attempts >= 3) {
       db.update(schema.contentItems).set({ status: "failed", error: msg.slice(0, 400) }).where(eq(schema.contentItems.id, p.itemId)).run();
+    }
+    if (job.type === "ready_remake") {
+      // paid AI call: never retried automatically; the admin sees the error and decides
+      db.update(schema.contentItems).set({ error: `Remake failed: ${msg.slice(0, 300)}` }).where(eq(schema.contentItems.id, p.itemId)).run();
+      finishJob(job.id, msg.slice(0, 1000));
+      return;
     }
     finishJob(job.id, msg.slice(0, 1000), { attempts: job.attempts });
   }

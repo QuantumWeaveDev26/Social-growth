@@ -10,14 +10,14 @@ import { fmtDateTime } from "@/lib/format";
 import { StatusChip, ApproveMark } from "@/components/ui";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { SubmitButton } from "@/components/SubmitButton";
-import { approveItem, unscheduleItem, postNow } from "../../actions";
+import { approveItem, unscheduleItem, postNow, managedRequestChange } from "../../actions";
 import { ChangesForm, PreviewTabs } from "./Client";
 import { remakeAllowance, remakePrice } from "@/lib/remakes";
 import { razorpayLive } from "@/lib/razorpay";
 
 export const metadata = { title: "Review" };
 
-export default async function ItemPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ approved?: string; posting?: string }> }) {
+export default async function ItemPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ approved?: string; posting?: string; asked?: string }> }) {
   const { id } = await params;
   const sp = await searchParams;
   const { customer } = await requireCustomer();
@@ -36,6 +36,20 @@ export default async function ItemPage({ params, searchParams }: { params: Promi
   const resetsOn = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" }).format(allowance.resetsOn);
   const remakeProps = { freeLeft: allowance.left, freeTotal: allowance.free, resetsOn, price: remakePrice(item.type), kind: (item.type === "reel" ? "reel" : "post") as "post" | "reel", live: razorpayLive() };
   const brief = JSON.parse(item.brief);
+  const ready = item.planId === "ready"; // ready-made content the BrandMint team manages
+  const slides: string[] = Array.isArray(brief.slides) ? brief.slides : [];
+  const askChange = (label: string, open = false) => (
+    <details className="group" open={open}>
+      <summary className="cursor-pointer text-sm font-semibold text-ink">{label}</summary>
+      <form action={managedRequestChange} className="mt-3 grid gap-2">
+        <input type="hidden" name="itemId" value={id} />
+        <label htmlFor="mc" className="label">What should we change? (picture, video, caption or time)</label>
+        <textarea id="mc" name="comment" rows={3} required minLength={3} className="field" placeholder="e.g. Use our navy polo instead of the red one, and add our WhatsApp number to the caption" />
+        <div><SubmitButton className="btn btn-ghost" pending="Sending">Send to the BrandMint team</SubmitButton></div>
+        <p className="text-xs text-ink-3">It comes off the schedule until we’ve made the change and you’ve approved it.</p>
+      </form>
+    </details>
+  );
   const copy = item.copy ? JSON.parse(item.copy) : null;
   const making = ["planned", "generating", "changes_requested"].includes(item.status);
   const isVideo = item.mediaPath?.endsWith(".mp4");
@@ -53,6 +67,12 @@ export default async function ItemPage({ params, searchParams }: { params: Promi
     </div>
   ) : isVideo ? (
     <video src={mediaUrl(item.mediaPath)!} poster={mediaUrl(item.thumbPath) ?? undefined} controls playsInline className="size-full bg-black object-contain" />
+  ) : slides.length > 1 ? (
+    // carousel: swipe through the slides like on Instagram
+    <div className="flex size-full snap-x snap-mandatory overflow-x-auto" aria-label={`Carousel, ${slides.length} slides`}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      {slides.map((sl, i) => <img key={sl} src={mediaUrl(sl)!} alt={i === 0 ? copy?.alt_text || "" : `Slide ${i + 1}`} className="size-full shrink-0 snap-center object-cover" />)}
+    </div>
   ) : (
     // eslint-disable-next-line @next/next/no-img-element
     <img src={mediaUrl(item.mediaPath)!} alt={copy?.alt_text || ""} className="size-full object-cover" />
@@ -112,6 +132,19 @@ export default async function ItemPage({ params, searchParams }: { params: Promi
             </p>
           )}
 
+          {item.status === "ready_draft" && (
+            <div className="mt-8 rounded-[14px] bg-sheet p-6 ring-1 ring-line">
+              {item.pendingNote ? (<>
+                <p className="font-semibold">{sp.asked ? "Thanks, we’ve got it." : "We’re working on your change"}</p>
+                <p className="mt-1 text-sm text-ink-2">“{item.pendingNote}”</p>
+                <p className="mt-2 text-sm text-ink-2">We’ll send it back to you for approval once it’s updated. It won’t post before that.</p>
+              </>) : (<>
+                <p className="font-semibold">Being prepared by the BrandMint team</p>
+                <p className="mt-1 text-sm text-ink-2">Captions and final checks are in progress. It will appear on your calendar once it’s scheduled.</p>
+              </>)}
+            </div>
+          )}
+
           {item.status === "awaiting_approval" && (
             <div className="mt-8 rounded-[14px] bg-sheet p-6 ring-1 ring-line">
               <form action={approveItem} className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -121,7 +154,7 @@ export default async function ItemPage({ params, searchParams }: { params: Promi
                 <p className="min-w-[12rem] flex-1 text-sm text-ink-2">{nextToReview ? "Then we take you to the next one." : "This is the last one waiting."}</p>
               </form>
               <div className="mt-6 border-t border-line pt-5">
-                <ChangesForm itemId={id} {...remakeProps} pendingNote={item.pendingNote} />
+                {ready ? askChange("Not quite right? Tell us what to change", true) : <ChangesForm itemId={id} {...remakeProps} pendingNote={item.pendingNote} />}
               </div>
             </div>
           )}
@@ -154,10 +187,10 @@ export default async function ItemPage({ params, searchParams }: { params: Promi
                   {onMetaSchedule && <p className="mt-1 text-sm text-ink-2">Facebook: also in your <a href={`https://business.facebook.com/latest/posts/scheduled_posts?asset_id=${conn?.pageId ?? ""}`} target="_blank" rel="noopener noreferrer" className="font-semibold text-ink underline">Meta Business Suite schedule</a>.</p>}
                 </div>
               </div>
-              <div className="flex shrink-0 gap-2">
+              {ready ? <div className="w-full">{askChange("Want something changed before it goes live?")}</div> : <div className="flex shrink-0 gap-2">
                 <form action={postNow}><input type="hidden" name="itemId" value={id} /><SubmitButton className="btn btn-primary" pending="Posting">Post now</SubmitButton></form>
                 <form action={unscheduleItem}><input type="hidden" name="itemId" value={id} /><SubmitButton className="btn btn-ghost" pending="Pulling back">Pull back for changes</SubmitButton></form>
-              </div>
+              </div>}
             </div>
           )}
 

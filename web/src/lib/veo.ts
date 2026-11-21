@@ -141,11 +141,12 @@ function oneAtATime<T>(fn: () => Promise<T>): Promise<T> {
   return run;
 }
 
-export function geminiImage(prompt: string, aspect: "1:1" | "4:5" | "3:4" | "9:16" | "16:9", model = GEMINI_IMAGE_MODEL) {
-  return oneAtATime(() => geminiImageNow(prompt, aspect, model));
+/** refs: images the model should edit or follow (JPEG/PNG bytes), sent before the prompt. */
+export function geminiImage(prompt: string, aspect: "1:1" | "4:5" | "3:4" | "9:16" | "16:9", model = GEMINI_IMAGE_MODEL, refs: Buffer[] = []) {
+  return oneAtATime(() => geminiImageNow(prompt, aspect, model, refs));
 }
 
-async function geminiImageNow(prompt: string, aspect: "1:1" | "4:5" | "3:4" | "9:16" | "16:9", model: string) {
+async function geminiImageNow(prompt: string, aspect: "1:1" | "4:5" | "3:4" | "9:16" | "16:9", model: string, refs: Buffer[] = []) {
   const k = sa();
   if (!k) throw new Error("Google image generation isn't configured (GOOGLE_SA_JSON_B64 missing)");
   const loc = process.env.GEMINI_LOCATION || "global";
@@ -153,7 +154,7 @@ async function geminiImageNow(prompt: string, aspect: "1:1" | "4:5" | "3:4" | "9
   const url = `https://${host}/v1/projects/${k.project_id}/locations/${loc}/publishers/google/models/${model}:generateContent`;
   const backup = model === GEMINI_IMAGE_BACKUP_MODEL;
   const r = await call<{ candidates?: Array<{ content?: { parts?: Array<{ text?: string; inlineData?: { mimeType?: string; data?: string } }> }; finishReason?: string }> }>(url, {
-    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    contents: [{ role: "user", parts: [...refs.map((b) => ({ inlineData: { mimeType: b[0] === 0x89 ? "image/png" : "image/jpeg", data: b.toString("base64") } })), { text: prompt }] }],
     // the 2.5 model has one output size, so it takes no imageSize
     generationConfig: { responseModalities: ["IMAGE"], imageConfig: backup ? { aspectRatio: aspect } : { aspectRatio: aspect, imageSize: GEMINI_IMAGE_SIZE } },
   }, 180_000);
@@ -166,7 +167,7 @@ async function geminiImageNow(prompt: string, aspect: "1:1" | "4:5" | "3:4" | "9
  * Turns one still image into a vertical clip. Returns the MP4 bytes and its list-price cost.
  * Waits for Google's long-running operation (usually 1–3 minutes).
  */
-export async function imageToVideo(imagePath: string, prompt: string, o: { seconds?: number; onWait?: (s: number) => void; model?: string } = {}) {
+export async function imageToVideo(imagePath: string, prompt: string, o: { seconds?: number; onWait?: (s: number) => void; model?: string; audio?: boolean; negative?: string } = {}) {
   const model = o.model || VEO_MODEL;
   const seconds = [4, 6, 8].includes(o.seconds ?? CLIP_SECONDS) ? (o.seconds ?? CLIP_SECONDS) : 8;
   // crop to an exact 9:16 frame first, so Veo fills the screen instead of adding black bars
@@ -175,7 +176,7 @@ export async function imageToVideo(imagePath: string, prompt: string, o: { secon
   const mimeType = "image/jpeg";
   const op = await call<{ name: string }>(`${base(model)}:predictLongRunning`, {
     instances: [{ prompt, image: { bytesBase64Encoded: img, mimeType } }],
-    parameters: { aspectRatio: "9:16", durationSeconds: seconds, resolution: RESOLUTION, generateAudio: false, sampleCount: 1, personGeneration: "allow_adult", enhancePrompt: true, negativePrompt: VEO_NEGATIVE_PROMPT },
+    parameters: { aspectRatio: "9:16", durationSeconds: seconds, resolution: RESOLUTION, generateAudio: !!o.audio, sampleCount: 1, personGeneration: "allow_adult", enhancePrompt: true, negativePrompt: o.negative ?? VEO_NEGATIVE_PROMPT },
   });
   const started = Date.now();
   for (;;) {
@@ -191,7 +192,7 @@ export async function imageToVideo(imagePath: string, prompt: string, o: { secon
         const why = st.response?.raiMediaFilteredReasons?.join("; ");
         throw new Error(why ? `Veo blocked the clip: ${why}` : `Veo returned no video${v?.gcsUri ? " (only a storage link)" : ""}`);
       }
-      return { mp4: Buffer.from(v.bytesBase64Encoded, "base64"), seconds, costUsd: seconds * (o.model ? Number(process.env.VEO_PRICE_PER_SEC || veoPricePerSec(model)) : PRICE_PER_SEC) };
+      return { mp4: Buffer.from(v.bytesBase64Encoded, "base64"), seconds, costUsd: seconds * (o.model ? Number(process.env.VEO_PRICE_PER_SEC || veoPricePerSec(model)) : PRICE_PER_SEC) * (o.audio ? 1.5 : 1) };
     }
     if (Date.now() - started > 10 * 60_000) throw new Error("Veo took longer than 10 minutes");
   }

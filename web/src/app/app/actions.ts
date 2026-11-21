@@ -206,3 +206,21 @@ export async function changePassword(_: PasswordState, fd: FormData): Promise<Pa
   await createSession(user.id);
   return { ok: true };
 }
+
+/** Managed clients: ask the BrandMint team for a change on a ready-made post. It comes off the schedule until the team updates it. */
+export async function managedRequestChange(fd: FormData) {
+  const itemId = String(fd.get("itemId"));
+  const comment = String(fd.get("comment") || "").trim().slice(0, 2000);
+  const { customer, item } = await ownItem(itemId);
+  if (item.planId !== "ready" || comment.length < 3 || !["awaiting_approval", "approved", "scheduled"].includes(item.status)) redirect(`/app/items/${itemId}`);
+  const { pullFromMeta } = await import("@/lib/readyRemake");
+  await pullFromMeta(item.id, customer.id);
+  db.update(schema.contentItems).set({ status: "ready_draft", pendingNote: comment, error: null, updatedAt: new Date() }).where(eq(schema.contentItems.id, itemId)).run();
+  db.insert(schema.approvals).values({ itemId, decision: "changes", comment }).run();
+  const { notify } = await import("@/lib/notify");
+  for (const a of db.select().from(schema.users).where(eq(schema.users.role, "admin")).all()) {
+    notify(null, { kind: "approvals_due", email: true, link: `/admin/customers/${customer.id}`, cta: "Open the client", title: `${customer.businessName} asked for a change`, body: `On the post set for ${item.slotAt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })}:\n\n“${comment}”\n\nIt’s off the schedule until you update it and send it back for review.` }, a.id);
+  }
+  revalidatePath("/app");
+  redirect(`/app/items/${itemId}?asked=1`);
+}
