@@ -194,9 +194,15 @@ export async function adminReadyRemake(fd: FormData) {
   const prompt = String(fd.get("prompt") || "").trim().slice(0, 2000);
   if (prompt.length < 4 || item.status === "published") return back(item.customerId);
   const mode = String(fd.get("mode") || "edit") as RemakeMode;
-  const opts = { prompt, mode, slide: Number(fd.get("slide") || 1), seconds: Number(fd.get("seconds") || 8), audio: fd.get("audio") === "1", logo: fd.get("logo") === "1", recaption: fd.get("recaption") === "1" };
+  // reference images (e.g. a screenshot of the person or frame the prompt is about)
+  const refs: string[] = [];
+  for (const f of (fd.getAll("refs") as File[]).filter((f) => f && f.size > 0 && f.type.startsWith("image/")).slice(0, 4)) {
+    const jpg = await sharp(Buffer.from(await f.arrayBuffer())).rotate().resize(1600, 1600, { fit: "inside" }).flatten({ background: "#ffffff" }).jpeg({ quality: 90 }).toBuffer();
+    refs.push(saveFile(`${item.customerId}/${READY_PLAN}/${item.id}/refs/${crypto.randomUUID()}.jpg`, jpg));
+  }
+  const opts = { prompt, mode, refs, slide: Number(fd.get("slide") || 1), seconds: Number(fd.get("seconds") || 8), audio: fd.get("audio") === "1", logo: fd.get("logo") === "1", recaption: fd.get("recaption") === "1" };
   if (item.status !== "ready_draft") await pullFromMeta(item.id, item.customerId);
-  db.update(schema.contentItems).set({ status: "ready_draft", error: mode.startsWith("video") ? "Remaking: filming with Veo (2–5 minutes)…" : "Remaking: new image (under a minute)…", updatedAt: new Date() }).where(eq(schema.contentItems.id, item.id)).run();
+  db.update(schema.contentItems).set({ status: "ready_draft", error: mode === "video_edit" ? "Remaking: finding the parts to change, then re-filming them (5–15 minutes)…" : mode.startsWith("video") ? "Remaking: filming with Veo (2–5 minutes)…" : "Remaking: new image (under a minute)…", updatedAt: new Date() }).where(eq(schema.contentItems.id, item.id)).run();
   enqueue("ready_remake", { itemId: item.id, opts }, { customerId: item.customerId });
   back(item.customerId);
 }

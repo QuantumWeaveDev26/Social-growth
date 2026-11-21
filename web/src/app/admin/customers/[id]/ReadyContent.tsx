@@ -127,6 +127,7 @@ export function ReadyContent({ customerId, connected, postingTimes }: { customer
                     <span className="tnum text-sm text-ink-2">{fmtDateTime(it.slotAt)}</span>
                     {it.error && <span className={`text-sm ${/captions…|^Remaking/.test(it.error) ? "text-ink-2" : "text-red"}`}>{it.error}</span>}
                   </div>
+                  {Array.isArray(brief.lastEdit) && brief.lastEdit.length > 0 && <p className="text-xs text-ink-3">Last video edit re-filmed {brief.lastEdit.map((x: { start: number; end: number }) => `${x.start}–${x.end} s`).join(", ")}. Watch those parts before sending it on.</p>}
                   {it.pendingNote && <p className="rounded-[10px] bg-amber-wash p-3 text-sm text-amber-deep"><span className="font-semibold">Client asked for changes:</span> {it.pendingNote}</p>}
                   <div className="grid gap-3 md:grid-cols-2">
                     <div><label className="label" htmlFor={`ig-${it.id}`}>Instagram caption</label><textarea id={`ig-${it.id}`} name="ig" rows={5} defaultValue={copy.instagram_caption || ""} disabled={locked} maxLength={2200} className="field" /></div>
@@ -161,13 +162,14 @@ export function ReadyContent({ customerId, connected, postingTimes }: { customer
                       <summary className="cursor-pointer text-sm font-semibold">Change this {it.type === "reel" ? "reel" : slides.length > 1 ? "carousel" : "post"}: remake with a prompt, replace the file, or rewrite captions</summary>
                       <form action={adminReadyRemake} className="mt-3 grid gap-2">
                         <input type="hidden" name="itemId" value={it.id} />
-                        <label className="label" htmlFor={`rp-${it.id}`}>{it.type === "reel" ? "What should the new video show? (Veo 3.1, up to 8 seconds)" : "What should change? (Gemini image)"}</label>
-                        <textarea id={`rp-${it.id}`} name="prompt" rows={3} required minLength={4} defaultValue={it.pendingNote || ""} className="field" placeholder={it.type === "reel" ? "e.g. Slow push-in on the team in matching navy polos at the office entrance, morning light" : "e.g. Make the headline say “Same team. Same look.” and change the polo colour to navy"} />
+                        <label className="label" htmlFor={`rp-${it.id}`}>{it.type === "reel" ? "What should change in this video?" : "What should change? (Gemini image)"}</label>
+                        <textarea id={`rp-${it.id}`} name="prompt" rows={3} required minLength={4} defaultValue={it.pendingNote || ""} className="field" placeholder={it.type === "reel" ? "e.g. Remove the man in the blue shirt (see the reference image) and his name title; keep everything else as it is" : "e.g. Make the headline say “Same team. Same look.” and change the polo colour to navy"} />
                         <div className="flex flex-wrap items-end gap-3 text-sm">
                           <div><label className="label" htmlFor={`rm-${it.id}`}>How</label>
                             <select id={`rm-${it.id}`} name="mode" className="field py-1.5">
                               {it.type === "reel" ? (<>
-                                <option value="video_frame">New video starting from the current video’s first frame</option>
+                                <option value="video_edit">Edit this video: change only the parts the prompt is about (keeps the rest and the audio)</option>
+                                <option value="video_frame">New 8-second video starting from the current video’s first frame</option>
                                 <option value="video_new">New start image from the prompt, then video</option>
                               </>) : (<>
                                 <option value="edit">Edit the current image (keep the rest)</option>
@@ -175,13 +177,14 @@ export function ReadyContent({ customerId, connected, postingTimes }: { customer
                                 <option value="video_new">Turn it into a reel (Veo 3.1)</option>
                               </>)}
                             </select></div>
+                          <div><label className="label" htmlFor={`rr-${it.id}`}>Reference images (optional: a screenshot of the person, frame or product)</label><input id={`rr-${it.id}`} name="refs" type="file" multiple accept="image/jpeg,image/png,image/webp" className="field py-1.5" /></div>
                           {slides.length > 1 && <div><label className="label" htmlFor={`rs-${it.id}`}>Slide</label><input id={`rs-${it.id}`} name="slide" type="number" min={1} max={slides.length} defaultValue={1} className="field w-20 py-1.5" /></div>}
-                          <div><label className="label" htmlFor={`sec-${it.id}`}>Video length</label><select id={`sec-${it.id}`} name="seconds" defaultValue="8" className="field py-1.5"><option value="4">4 s</option><option value="6">6 s</option><option value="8">8 s</option></select></div>
+                          <div><label className="label" htmlFor={`sec-${it.id}`}>Video length (new videos)</label><select id={`sec-${it.id}`} name="seconds" defaultValue="8" className="field py-1.5"><option value="4">4 s</option><option value="6">6 s</option><option value="8">8 s</option></select></div>
                           <label className="flex items-center gap-1.5"><input type="checkbox" name="audio" value="1" />Video with natural sound</label>
                           <label className="flex items-center gap-1.5"><input type="checkbox" name="logo" value="1" />Add the client’s logo (new images)</label>
                           <label className="flex items-center gap-1.5"><input type="checkbox" name="recaption" value="1" />Rewrite captions after</label>
                         </div>
-                        <div><SubmitButton pending="Starting" disabled={busy(it)}>Remake</SubmitButton> <span className="text-xs text-ink-3">Runs even while AI generation is paused. Image about $0.10, video about $0.80 for 8 s. You can undo it.</span></div>
+                        <div><SubmitButton pending="Starting" disabled={busy(it)}>Remake</SubmitButton> <span className="text-xs text-ink-3">Runs even while AI generation is paused. Image about $0.10, new video about $0.80 for 8 s; “Edit this video” costs about $0.10 per second it re-films. You can undo it.</span></div>
                       </form>
                       <form action={adminReadyReplace} className="mt-4 flex flex-wrap items-end gap-2 border-t border-line pt-3">
                         <input type="hidden" name="itemId" value={it.id} />
