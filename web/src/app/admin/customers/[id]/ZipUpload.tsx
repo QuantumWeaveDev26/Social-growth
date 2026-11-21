@@ -10,24 +10,39 @@ export function ZipUpload({ customerId, today, times, notes }: { customerId: str
   const [msg, setMsg] = useState("");
   const [f, setF] = useState({ startDay: today, times, everyDays: "1", notes, mode: "auto", days: "30", autoSchedule: true });
 
-  function send() {
+  /** Sends the zip in 4 MB pieces (each well under the proxy's 60-second limit), retrying a piece up to 4 times. */
+  async function send() {
     const zip = file.current?.files?.[0];
     if (!zip) { setMsg("Choose a .zip first"); return; }
     const q = new URLSearchParams({ customerId, startDay: f.startDay, times: f.times, everyDays: f.everyDays, notes: f.notes, mode: f.mode, days: f.days, autoSchedule: f.autoSchedule ? "1" : "0" });
-    const x = new XMLHttpRequest();
-    x.open("POST", `/api/admin/ready-zip?${q}`);
-    x.setRequestHeader("Content-Type", "application/zip");
-    x.upload.onprogress = (e) => { if (e.lengthComputable) setPct(Math.round((e.loaded / e.total) * 100)); };
-    x.onload = () => {
-      let r: { created?: number; error?: string } = {};
-      try { r = JSON.parse(x.responseText); } catch { /* not JSON */ }
-      setPct(null);
-      if (x.status >= 200 && x.status < 300) { setMsg(`Added ${r.created} items to the calendar. Captions are being written now (about 30 seconds each)${f.autoSchedule ? " and each item is scheduled as soon as its captions are ready" : ""}.`); if (file.current) file.current.value = ""; router.refresh(); }
-      else setMsg(r.error || `Upload failed (${x.status})`);
-    };
-    x.onerror = () => { setPct(null); setMsg("Upload failed: network error"); };
+    const CHUNK = 4 * 1024 * 1024;
+    const parts = Math.max(1, Math.ceil(zip.size / CHUNK));
+    const upload = crypto.randomUUID();
     setMsg(""); setPct(0);
-    x.send(zip);
+    const put = (i: number) => new Promise<{ status: number; body: { created?: number; error?: string } }>((resolve) => {
+      const x = new XMLHttpRequest();
+      x.open("POST", `/api/admin/ready-zip?${q}&upload=${upload}&part=${i}&parts=${parts}&offset=${i * CHUNK}`);
+      x.setRequestHeader("Content-Type", "application/octet-stream");
+      x.upload.onprogress = (e) => { if (e.lengthComputable) setPct(Math.min(99, Math.round(((i * CHUNK + e.loaded) / zip.size) * 100))); };
+      x.onload = () => { let b = {}; try { b = JSON.parse(x.responseText); } catch { /* not JSON */ } resolve({ status: x.status, body: b }); };
+      x.onerror = () => resolve({ status: 0, body: { error: "network error" } });
+      x.send(zip.slice(i * CHUNK, Math.min(zip.size, (i + 1) * CHUNK)));
+    });
+    let last: Awaited<ReturnType<typeof put>> = { status: 0, body: {} };
+    for (let i = 0; i < parts; i++) {
+      if (i === parts - 1) setMsg("Last piece: unpacking and placing on the calendar after it arrives…");
+      for (let attempt = 1; attempt <= 4; attempt++) {
+        last = await put(i);
+        if (last.status >= 200 && last.status < 300) break;
+        if (last.status === 409 || last.status === 403 || last.status === 400) break; // not worth retrying
+        await new Promise((r) => setTimeout(r, 2000 * attempt));
+      }
+      if (last.status < 200 || last.status >= 300) { setPct(null); setMsg(last.body.error ? `Upload failed: ${last.body.error}` : `Upload failed (${last.status || "network"}) at ${Math.round((i / parts) * 100)}%. Try again.`); return; }
+    }
+    setPct(null);
+    setMsg(`Added ${last.body.created} items to the calendar. Captions are being written now (about 30 seconds each)${f.autoSchedule ? " and each item is scheduled as soon as its captions are ready" : ""}.`);
+    if (file.current) file.current.value = "";
+    router.refresh();
   }
 
   const busy = pct !== null;
