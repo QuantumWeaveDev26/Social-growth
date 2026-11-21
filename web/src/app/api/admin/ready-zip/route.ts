@@ -34,7 +34,10 @@ export async function POST(req: Request) {
 
   const file = await saveUploadToTemp(req.body);
   try {
-    const ids = await importZip(customerId, file, { startDay: q.get("startDay") || "", times: parseTimes(q.get("times") || ""), everyDays: Number(q.get("everyDays") || 1) });
+    const ids = await importZip(customerId, file, {
+      startDay: q.get("startDay") || "", mode: q.get("mode") === "manual" ? "manual" : "auto", days: Math.min(90, Math.max(7, Number(q.get("days") || 30))),
+      times: parseTimes(q.get("times") || ""), everyDays: Number(q.get("everyDays") || 1), autoSchedule: q.get("autoSchedule") !== "0",
+    });
     if (q.get("captions") !== "0") void writeReadyCopyAll(ids); // background: each item shows "Writing captions…" until done
     return NextResponse.json({ created: ids.length });
   } catch (e) {

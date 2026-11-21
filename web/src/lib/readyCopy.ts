@@ -107,7 +107,9 @@ export async function writeReadyCopy(itemId: string): Promise<number> {
   const ig = [String(x.instagram_caption || "").trim(), tags.join(" ")].filter(Boolean).join("\n\n").slice(0, 2200);
   const prev = JSON.parse(item.copy || "{}");
   const copy = { ...prev, instagram_caption: ig, facebook_post: String(x.facebook_post || "").trim() || ig, hashtags: tags, alt_text: String(x.alt_text || "").slice(0, 1000), ad: x.ad || null, written_by: r.engine };
-  db.update(schema.contentItems).set({ copy: JSON.stringify(copy), error: null, costUsd: (item.costUsd || 0) + r.costUsd, updatedAt: new Date() }).where(eq(schema.contentItems.id, item.id)).run();
+  // batches uploaded with "schedule automatically" go live as soon as their words are written
+  const auto = JSON.parse(item.brief || "{}").autoSchedule === true && item.status === "ready_draft" && item.slotAt.getTime() > Date.now() + 5 * 60_000;
+  db.update(schema.contentItems).set({ copy: JSON.stringify(copy), error: null, costUsd: (item.costUsd || 0) + r.costUsd, updatedAt: new Date(), ...(auto ? { status: "approved" } : {}) }).where(eq(schema.contentItems.id, item.id)).run();
   return r.costUsd;
 }
 

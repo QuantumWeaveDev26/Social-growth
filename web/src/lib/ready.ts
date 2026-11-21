@@ -36,3 +36,62 @@ export function slots(n: number, startDay: string, times: string[], everyDays: n
   return out;
 }
 
+
+// ---------------------------------------------------------------- auto-plan (content strategy for a batch)
+export type Kind = "post" | "carousel" | "reel";
+/** Best default times (India): reels in the evening scroll, carousels at lunch (saves), single posts mid-morning. */
+export const KIND_TIME: Record<Kind, string> = { reel: "19:00", carousel: "13:00", post: "10:30" };
+const SECOND_TIME: Record<Kind, string> = { reel: "20:30", carousel: "17:30", post: "18:30" };
+
+/**
+ * Orders a batch so formats alternate (no two reels or two carousels in a row when avoidable; a reel
+ * opens the plan because reels reach new people) and spreads it evenly over `days` days from `startDay`,
+ * one item a day when it fits, two otherwise. Returns, for each input index, its date.
+ */
+export function autoPlan(kinds: Kind[], startDay: string, days = 30): { order: number[]; when: Date[] } {
+  const queues: Record<Kind, number[]> = { reel: [], carousel: [], post: [] };
+  kinds.forEach((k, i) => queues[k].push(i));
+  const total = kinds.length;
+  const order: number[] = [];
+  let prev: Kind | null = null;
+  for (let n = 0; n < total; n++) {
+    // pick the format most "behind" its fair share, avoiding a repeat when possible
+    const share = (k: Kind) => (kinds.filter((x) => x === k).length / total) * (n + 1) - order.filter((i) => kinds[i] === k).length;
+    const avail = (["reel", "carousel", "post"] as Kind[]).filter((k) => queues[k].length);
+    const pick = (n === 0 && queues.reel.length ? "reel" : null)
+      ?? avail.filter((k) => k !== prev).sort((a, b) => share(b) - share(a))[0]
+      ?? avail[0];
+    order.push(queues[pick].shift()!);
+    prev = pick;
+  }
+  // dates: spread over the window; two per day only if needed
+  const span = Math.max(1, days);
+  const perDay = Math.ceil(total / span);
+  const startIst = istDate(/^\d{4}-\d{2}-\d{2}$/.test(startDay) ? startDay : istParts(new Date(Date.now() + 86400e3)).day, "00:00")!;
+  const earliest = Date.now() + 30 * 60_000;
+  const used = new Map<string, number>();
+  const when: Date[] = new Array(total);
+  order.forEach((idx, pos) => {
+    let dayOffset = Math.floor((Math.floor(pos / perDay) * span) / Math.ceil(total / perDay)); // even gaps between posting days
+    for (let guard = 0; guard < 400; guard++, dayOffset++) {
+      const ymd = istParts(new Date(startIst.getTime() + dayOffset * 86400e3)).day;
+      const count = used.get(ymd) || 0;
+      if (count >= perDay) continue;
+      const k = kinds[idx];
+      const d = istDate(ymd, count === 0 ? KIND_TIME[k] : SECOND_TIME[k])!;
+      if (d.getTime() < earliest) continue;
+      used.set(ymd, count + 1);
+      when[idx] = d;
+      break;
+    }
+  });
+  return { order, when };
+}
+
+/** A readable title for any content item (generated ones have on-image text; ready-made ones use their caption's first line). */
+export function itemTitle(copyJson: string | null, briefJson: string) {
+  const copy = copyJson ? JSON.parse(copyJson) : {};
+  const brief = JSON.parse(briefJson || "{}");
+  const first = String(copy.instagram_caption || "").split("\n").map((l: string) => l.trim()).find((l: string) => l && !l.startsWith("#"));
+  return copy.on_image_text || copy.cover_text || brief.topic || first || brief.file || "Untitled";
+}
