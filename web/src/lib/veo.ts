@@ -323,7 +323,7 @@ export async function geminiJson(system: string, user: string, model = GEMINI_TE
 }
 
 /** Gemini with images (inline JPEG/PNG parts) that must answer in JSON. */
-export async function geminiJsonParts(system: string, parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }>, model = GEMINI_TEXT_MODEL) {
+export async function geminiJsonParts(system: string, parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }>, model = GEMINI_TEXT_MODEL, timeoutMs = 180_000) {
   const k = sa();
   if (!k) throw new Error("Gemini isn't configured (GOOGLE_SA_JSON_B64 missing)");
   const loc = process.env.GEMINI_LOCATION || "global";
@@ -333,7 +333,7 @@ export async function geminiJsonParts(system: string, parts: Array<{ text: strin
     systemInstruction: { parts: [{ text: system }] },
     contents: [{ role: "user", parts }],
     generationConfig: { responseMimeType: "application/json", temperature: 0.8, maxOutputTokens: 8192 },
-  }, 180_000);
+  }, timeoutMs);
   const text = r.candidates?.[0]?.content?.parts?.map((x) => x.text || "").join("") || "";
   if (!text) throw new Error(`Gemini returned no text (${r.candidates?.[0]?.finishReason || "no candidates"})`);
   const u = r.usageMetadata || {};

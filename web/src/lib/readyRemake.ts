@@ -203,13 +203,15 @@ export async function editVideo(item: Item, file: string, instruction: string, r
   let cost = 0;
   try {
     // 1. sample frames
-    const step = Math.max(0.5, info.dur / 90);
+    const progress = (msg: string) => db.update(schema.contentItems).set({ error: `Remaking: ${msg}`, updatedAt: new Date() }).where(eq(schema.contentItems.id, item.id)).run();
+    progress("step 1 of 3, looking through the video for the parts to change…");
+    const step = Math.max(0.5, info.dur / 48); // at most ~48 frames: enough to find every shot, quick for Gemini
     const times: number[] = [];
     for (let t = 0; t < info.dur - 0.05; t += step) times.push(Number(t.toFixed(2)));
     const frames: Buffer[] = [];
     for (const [i, t] of times.entries()) {
       const o = path.join(tmp, `s${i}.jpg`);
-      await run(f.bin, ["-v", "error", "-y", "-ss", String(t), "-i", file, "-frames:v", "1", "-vf", "scale=360:-2", "-q:v", "5", o], { env: f.env, timeout: 60_000 }).catch(() => null);
+      await run(f.bin, ["-v", "error", "-y", "-ss", String(t), "-i", file, "-frames:v", "1", "-vf", "scale=320:-2", "-q:v", "6", o], { env: f.env, timeout: 60_000 }).catch(() => null);
       frames.push(fs.existsSync(o) ? fs.readFileSync(o) : Buffer.alloc(0));
     }
     const { geminiJsonParts, geminiImage, imageToVideo } = await import("./veo");
@@ -222,7 +224,10 @@ For each range give:
 - frame_prompt: an instruction for an image editor working on a still frame from that range: what to remove or change, what to fill it with so it looks natural (continue the real background), and any on-screen text to remove because it refers to what is removed. Keep the logo, colours, lighting and everything else.
 - motion: one sentence describing the camera movement and natural motion of that shot so it can be re-filmed (e.g. "slow push-in, leaves moving in a light breeze").
 Return ONLY JSON: {"segments":[{"start":0.0,"end":2.5,"frame_prompt":"...","motion":"..."}]} with times in seconds. Return {"segments":[]} if nothing needs to change.`;
-    const r = await geminiJsonParts(sys, parts, process.env.VIDEO_EDIT_MODEL || undefined);
+    // the frames are many images in one request: give Gemini up to 8 minutes, and try once more if it times out
+    let r: { text: string; costUsd: number };
+    try { r = await geminiJsonParts(sys, parts, process.env.VIDEO_EDIT_MODEL || undefined, 480_000); }
+    catch (e) { console.error("video edit plan, retrying:", e instanceof Error ? e.message : e); r = await geminiJsonParts(sys, parts, process.env.VIDEO_EDIT_MODEL || undefined, 480_000); }
     cost += r.costUsd;
     let segs: Segment[] = [];
     try { segs = (JSON.parse(r.text.replace(/^```json|```$/g, "")).segments || []) as Segment[]; } catch { throw new Error("Couldn’t read the edit plan"); }
@@ -244,10 +249,13 @@ Return ONLY JSON: {"segments":[{"start":0.0,"end":2.5,"frame_prompt":"...","moti
       await run(f.bin, ["-v", "error", "-y", "-ss", from.toFixed(3), "-t", (to - from).toFixed(3), "-i", file, "-vf", vf, ...enc, o], { env: f.env, timeout: 300_000 });
       pieces.push(o);
     };
+    const total = merged.reduce((n, s) => n + Math.ceil((s.end - s.start) / 8), 0);
+    let done = 0;
     for (const s of merged) {
       await cut(cursor, s.start);
       for (let a = s.start; a < s.end - 0.04; a += 8) {
         const len = Math.min(8, s.end - a);
+        progress(`step 2 of 3, re-filming ${s.start.toFixed(1)}–${s.end.toFixed(1)} s (clip ${++done} of ${total}, about 2–4 minutes each)…`);
         const fr = path.join(tmp, `f${k}.jpg`);
         await run(f.bin, ["-v", "error", "-y", "-ss", (a + Math.min(0.1, len / 2)).toFixed(3), "-i", file, "-frames:v", "1", "-q:v", "2", fr], { env: f.env, timeout: 60_000 });
         const still = await geminiImage(`Edit this frame from a vertical social video. ${s.frame_prompt}\nKeep everything else exactly as it is (framing, lighting, colours, logo). Photorealistic, no new text.`, "9:16", undefined, [fs.readFileSync(fr), ...refs]);
@@ -267,6 +275,7 @@ Return ONLY JSON: {"segments":[{"start":0.0,"end":2.5,"frame_prompt":"...","moti
     await cut(cursor, info.dur);
 
     // 3. join, then put the original soundtrack back
+    progress("step 3 of 3, putting the video back together…");
     fs.writeFileSync(path.join(tmp, "list.txt"), pieces.map((p) => `file '${p}'`).join("\n"));
     const joined = path.join(tmp, "joined.mp4");
     await run(f.bin, ["-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", path.join(tmp, "list.txt"), "-c", "copy", joined], { env: f.env, timeout: 300_000 });
