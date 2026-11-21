@@ -19,7 +19,7 @@ import { READY_PLAN } from "./ready";
 
 const run = promisify(execFile);
 type Item = typeof schema.contentItems.$inferSelect;
-export type RemakeMode = "edit" | "new" | "video_frame" | "video_new" | "video_edit" | "video_cut";
+export type RemakeMode = "edit" | "new" | "video_frame" | "video_new" | "video_edit" | "video_cut" | "video_remove";
 export type RemakeOpts = { prompt: string; mode: RemakeMode; slide?: number; seconds?: number; audio?: boolean; logo?: boolean; recaption?: boolean; refs?: string[] };
 export type Version = { media: string[]; at: string; prompt?: string; mode?: string };
 
@@ -97,9 +97,9 @@ export async function remakeReady(itemId: string, o: RemakeOpts) {
     return r.costUsd;
   }
 
-  if (o.mode === "video_edit") {
+  if (o.mode === "video_edit" || o.mode === "video_remove") {
     if (item.type !== "reel") throw new Error("“Edit this video” is for reels");
-    const r = await editVideo(item, absPath(media[0]), o.prompt, refs, `${dir}/reel-v${n}.mp4`);
+    const r = await editVideo(item, absPath(media[0]), o.prompt, refs, `${dir}/reel-v${n}.mp4`, o.mode === "video_remove");
     const fresh = db.select().from(schema.contentItems).where(eq(schema.contentItems.id, itemId)).get()!;
     const upd = saveVersion(fresh, [r.path], { prompt: o.prompt, mode: o.mode }, { autoSchedule: false, lastEdit: r.segments });
     db.update(schema.contentItems).set({ ...upd, type: "reel", error: r.segments.length ? null : "Nothing matched the instruction, so the video is unchanged", costUsd: (fresh.costUsd || 0) + r.costUsd, updatedAt: new Date() }).where(eq(schema.contentItems.id, itemId)).run();
@@ -178,7 +178,7 @@ export async function replaceMedia(item: Item, files: File[]) {
 }
 
 /** Gemini finds the time ranges of a video that an instruction is about (frames every ~0.5 s + reference images). */
-async function planSegments(item: Item, file: string, info: Awaited<ReturnType<typeof probe>>, instruction: string, refs: Buffer[], tmp: string) {
+async function planSegments(item: Item, file: string, info: Awaited<ReturnType<typeof probe>>, instruction: string, refs: Buffer[], tmp: string, keepText = false) {
   const f = await ff();
   let cost = 0;
     // 1. sample frames
@@ -198,7 +198,12 @@ async function planSegments(item: Item, file: string, info: Awaited<ReturnType<t
     if (refs.length) { parts.push({ text: "REFERENCE IMAGES from the agency:" }); refs.forEach((b) => parts.push({ inlineData: { mimeType: "image/jpeg", data: b.toString("base64") } })); }
     parts.push({ text: `INSTRUCTION: ${instruction}\n\nThe video is ${info.dur.toFixed(1)} s long. Frames follow, each labelled with its time.` });
     frames.forEach((b, i) => { if (b.length) { parts.push({ text: `t=${times[i]}s` }); parts.push({ inlineData: { mimeType: "image/jpeg", data: b.toString("base64") } }); } });
-    const sys = `You are a video editor. Find every time range of the video that must change to follow the INSTRUCTION (for example every shot where a given person is visible, including name titles or captions about them). Be precise and complete: include the whole shot from its first to its last frame. Leave everything else alone.
+    const sys = keepText ? `You are a video editor. Find every time range of the video where the person or object in the INSTRUCTION is visible. Be precise and complete: include the whole shot from its first to its last frame.
+For each range give:
+- frame_prompt: an instruction for an image editor working on a still frame from that range: remove ONLY that person/object and fill the space with the real background that would be behind it (continue the scenery naturally). ALL on-screen text (titles, names, subtitles, captions), the logo and every graphic must stay EXACTLY as they are, in the same place, size, font and colour, even text that is drawn over the person.
+- motion: one sentence describing the camera movement of that shot without the person (e.g. "static camera, leaves moving in a light breeze").
+- text_boxes: a tight box around EVERY piece of on-screen text and logo in that range (titles, names, subtitle lines, captions), as [ymin, xmin, ymax, xmax] in 0–1000 of the frame. Include every subtitle line that appears during the range.
+Return ONLY JSON: {"segments":[{"start":0.0,"end":2.5,"frame_prompt":"...","motion":"...","text_boxes":[[700,40,760,960]]}]} with times in seconds. Return {"segments":[]} if it never appears.` : `You are a video editor. Find every time range of the video that must change to follow the INSTRUCTION (for example every shot where a given person is visible, including name titles or captions about them). Be precise and complete: include the whole shot from its first to its last frame. Leave everything else alone.
 For each range give:
 - frame_prompt: an instruction for an image editor working on a still frame from that range: what to remove or change, what to fill it with so it looks natural (continue the real background), and any on-screen text to remove because it refers to what is removed. Keep the logo, colours, lighting and everything else.
 - motion: one sentence describing the camera movement and natural motion of that shot so it can be re-filmed (e.g. "slow push-in, leaves moving in a light breeze").
@@ -273,7 +278,7 @@ async function probe(file: string) {
   };
 }
 
-type Segment = { start: number; end: number; frame_prompt: string; motion: string };
+type Segment = { start: number; end: number; frame_prompt: string; motion: string; text_boxes?: number[][] };
 
 /**
  * Changes only the parts of a reel the instruction is about (e.g. "remove this person"), keeping the rest
@@ -282,7 +287,7 @@ type Segment = { start: number; end: number; frame_prompt: string; motion: strin
  *   2. for each range: Gemini image edits its first frame, Veo 3.1 films it for the length of the range
  *   3. the untouched parts and the new clips are joined; the original audio goes back on top
  */
-export async function editVideo(item: Item, file: string, instruction: string, refs: Buffer[], outRel: string) {
+export async function editVideo(item: Item, file: string, instruction: string, refs: Buffer[], outRel: string, keepText = false) {
   const f = await ff();
   const info = await probe(file);
   if (!info.dur) throw new Error("Couldn’t read the video");
@@ -290,7 +295,7 @@ export async function editVideo(item: Item, file: string, instruction: string, r
   let cost = 0;
   try {
     const progress = (msg: string) => db.update(schema.contentItems).set({ error: `Remaking: ${msg}`, updatedAt: new Date() }).where(eq(schema.contentItems.id, item.id)).run();
-    const plan = await planSegments(item, file, info, instruction, refs, tmp);
+    const plan = await planSegments(item, file, info, instruction, refs, tmp, keepText);
     cost += plan.costUsd;
     const merged = plan.segments, step = plan.step;
     void step;
@@ -318,7 +323,9 @@ export async function editVideo(item: Item, file: string, instruction: string, r
         progress(`step 2 of 3, re-filming ${s.start.toFixed(1)}–${s.end.toFixed(1)} s (clip ${++done} of ${total}, about 2–4 minutes each)…`);
         const fr = path.join(tmp, `f${k}.jpg`);
         await run(f.bin, ["-v", "error", "-y", "-ss", (a + Math.min(0.1, len / 2)).toFixed(3), "-i", file, "-frames:v", "1", "-q:v", "2", fr], { env: f.env, timeout: 60_000 });
-        const still = await geminiImage(`Edit this frame from a vertical social video. ${s.frame_prompt}\nKeep everything else exactly as it is (framing, lighting, colours, logo). Photorealistic, no new text.`, "9:16", undefined, [fs.readFileSync(fr), ...refs]);
+        const still = await geminiImage(keepText
+          ? `Edit this frame from a vertical social video. ${s.frame_prompt}\nRemove only that; do not move, resize, recolour or remove any text, logo or graphic. Same framing and lighting. Photorealistic.`
+          : `Edit this frame from a vertical social video. ${s.frame_prompt}\nKeep everything else exactly as it is (framing, lighting, colours, logo). Photorealistic, no new text.`, "9:16", undefined, [fs.readFileSync(fr), ...refs]);
         cost += still.costUsd;
         const stillFile = path.join(tmp, `e${k}.jpg`);
         fs.writeFileSync(stillFile, await sharp(still.png).jpeg({ quality: 92 }).toBuffer());
@@ -327,7 +334,23 @@ export async function editVideo(item: Item, file: string, instruction: string, r
         cost += v.costUsd;
         const raw = path.join(tmp, `v${k}.mp4`); fs.writeFileSync(raw, v.mp4);
         const o = path.join(tmp, `p${k++}.mp4`);
-        await run(f.bin, ["-v", "error", "-y", "-t", len.toFixed(3), "-i", raw, "-vf", vf, ...enc, o], { env: f.env, timeout: 300_000 });
+        if (!keepText) await run(f.bin, ["-v", "error", "-y", "-t", len.toFixed(3), "-i", raw, "-vf", vf, ...enc, o], { env: f.env, timeout: 300_000 });
+        else {
+          // only the person's area comes from the new footage; the original video (with its moving text) stays everywhere else
+          const orig = path.join(tmp, `o${k}.mp4`), clean = path.join(tmp, `c${k}.mp4`);
+          await run(f.bin, ["-v", "error", "-y", "-ss", a.toFixed(3), "-t", len.toFixed(3), "-i", file, "-vf", vf, ...enc, orig], { env: f.env, timeout: 300_000 });
+          await run(f.bin, ["-v", "error", "-y", "-t", len.toFixed(3), "-i", raw, "-vf", vf, ...enc, clean], { env: f.env, timeout: 300_000 });
+          // a fresh mask for every frame, so the person is followed as they move
+          const fdir = path.join(tmp, `fr${k}`), mdir = path.join(tmp, `mk${k}`);
+          fs.mkdirSync(fdir); fs.mkdirSync(mdir);
+          const w2 = Math.round(W / 4) * 2, h2 = Math.round(H / 4) * 2; // masks at half size, scaled up when merging
+          await run(f.bin, ["-v", "error", "-y", "-i", orig, "-vf", `scale=${w2}:${h2}`, path.join(fdir, "%05d.png")], { env: f.env, timeout: 300_000 });
+          const names = fs.readdirSync(fdir).filter((x) => x.endsWith(".png")).sort();
+          await removalMasks(names.map((x) => path.join(fdir, x)), still.png, w2, h2, s.text_boxes || [], mdir);
+          await run(f.bin, ["-v", "error", "-y", "-i", orig, "-i", clean, "-framerate", String(info.fps), "-i", path.join(mdir, "%05d.png"),
+            "-filter_complex", `[0:v]format=gbrp[a];[1:v]format=gbrp[b];[2:v]scale=${W}:${H},format=gbrp[m];[a][b][m]maskedmerge,format=yuv420p[v]`,
+            "-map", "[v]", "-t", len.toFixed(3), ...enc, o], { env: f.env, timeout: 300_000 });
+        }
         pieces.push(o);
       }
       cursor = s.end;
@@ -343,4 +366,72 @@ export async function editVideo(item: Item, file: string, instruction: string, r
     await run(f.bin, ["-v", "error", "-y", "-i", joined, "-i", file, "-map", "0:v", ...(info.audio ? ["-map", "1:a", "-c:a", "aac", "-b:a", "192k"] : []), "-c:v", "copy", "-t", info.dur.toFixed(3), "-movflags", "+faststart", out], { env: f.env, timeout: 300_000 });
     return { path: saveFile(outRel, fs.readFileSync(out)), segments: merged.map((s) => ({ start: Number(s.start.toFixed(2)), end: Number(s.end.toFixed(2)), change: s.frame_prompt })), costUsd: cost };
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+}
+
+/**
+ * Per-frame masks (white = take the cleaned footage) for "remove a person":
+ *  - the person = big shapes where the frame differs from the cleaned still (small specks and thin strokes ignored)
+ *  - inside the person, on-screen text is kept from the original: pixels in Gemini's text boxes that look like text
+ *    (white/grey or lime letters), and pixels that already match the clean background
+ */
+export async function removalMasks(files: string[], cleanPng: Buffer, w2: number, h2: number, boxes: number[][], outDir: string) {
+  const N = w2 * h2;
+  const rgb = async (b: Buffer | string, blur?: number) => { let p = sharp(b).resize(w2, h2, { fit: "cover" }).removeAlpha(); if (blur) p = p.blur(blur); return p.raw().toBuffer(); };
+  const clean = await rgb(cleanPng, 1);
+  const inBox = new Uint8Array(N);
+  for (const bx of boxes) {
+    if (!Array.isArray(bx) || bx.length < 4) continue;
+    const [y0, x0, y1, x1] = bx.map(Number);
+    for (let y = Math.max(0, Math.floor((y0 / 1000) * h2) - 3); y < Math.min(h2, Math.ceil((y1 / 1000) * h2) + 3); y++)
+      for (let x = Math.max(0, Math.floor((x0 / 1000) * w2) - 3); x < Math.min(w2, Math.ceil((x1 / 1000) * w2) + 3); x++) inBox[y * w2 + x] = 1;
+  }
+  if (!boxes.length) inBox.fill(1); // no boxes from Gemini: look for letters anywhere
+  // letters in the cleaned still (Gemini keeps the text): a letter is kept from the original only where the still has one too
+  const isText = (r: number, g: number, b: number) => { const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = 0.3 * r + 0.59 * g + 0.11 * b; return (l > 105 && mx - mn < 70) || (g > 165 && r > 120 && b < 150 && g > b + 50); };
+  const cleanRaw = await sharp(cleanPng).resize(w2, h2, { fit: "cover" }).removeAlpha().raw().toBuffer();
+  const stillText = new Uint8Array(N);
+  for (let y = 0; y < h2; y++) for (let x = 0; x < w2; x++) {
+    const i = y * w2 + x;
+    if (!inBox[i] || !isText(cleanRaw[i * 3], cleanRaw[i * 3 + 1], cleanRaw[i * 3 + 2])) continue;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const yy = y + dy, xx = x + dx; if (yy >= 0 && yy < h2 && xx >= 0 && xx < w2) stillText[yy * w2 + xx] = 1; }
+  }
+  const q = 4, w = Math.ceil(w2 / q), h = Math.ceil(h2 / q);
+  const morph = (src: Uint8Array, r: number, grow: boolean) => {
+    const a = new Uint8Array(w * h), b = new Uint8Array(w * h);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let m = grow ? 0 : 1; for (let k = -r; k <= r; k++) { const xx = x + k; const v = xx >= 0 && xx < w ? src[y * w + xx] : 0; if (grow && v) { m = 1; break; } if (!grow && !v) { m = 0; break; } } a[y * w + x] = m; }
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let m = grow ? 0 : 1; for (let k = -r; k <= r; k++) { const yy = y + k; const v = yy >= 0 && yy < h ? a[yy * w + x] : 0; if (grow && v) { m = 1; break; } if (!grow && !v) { m = 0; break; } } b[y * w + x] = m; }
+    return b;
+  };
+  let prev: Uint8Array<ArrayBuffer> | null = null;
+  for (const [fi, file] of files.entries()) {
+    const raw = await sharp(file).resize(w2, h2, { fit: "cover" }).removeAlpha().raw().toBuffer();
+    const o = await rgb(file, 1);
+    const d = new Uint8Array(N);
+    for (let i = 0; i < N; i++) d[i] = Math.max(Math.abs(o[i * 3] - clean[i * 3]), Math.abs(o[i * 3 + 1] - clean[i * 3 + 1]), Math.abs(o[i * 3 + 2] - clean[i * 3 + 2]));
+    let g = new Uint8Array(w * h);
+    const cnt = new Uint8Array(w * h);
+    for (let y = 0; y < h2; y++) for (let x = 0; x < w2; x++) if (d[y * w2 + x] > 40) cnt[((y / q) | 0) * w + ((x / q) | 0)]++;
+    for (let i = 0; i < g.length; i++) g[i] = cnt[i] >= 5 ? 1 : 0;
+    g = morph(g, 2, false); // drop thin strokes and specks
+    const seen = new Uint8Array(w * h), keep = new Uint8Array(w * h);
+    for (let i = 0; i < g.length; i++) {
+      if (!g[i] || seen[i]) continue;
+      const stack = [i], comp: number[] = []; seen[i] = 1;
+      while (stack.length) { const c = stack.pop()!; comp.push(c); const cx = c % w, cy = (c / w) | 0;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = cx + dx, ny = cy + dy; if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue; const ni = ny * w + nx; if (g[ni] && !seen[ni]) { seen[ni] = 1; stack.push(ni); } } }
+      if (comp.length > w * h * 0.004) for (const c of comp) keep[c] = 1;
+    }
+    g = morph(keep, 2 + 5, true); // back to size, plus a margin for hair, edges and motion blur
+    let area = 0; for (const v of g) area += v;
+    if (area > w * h * 0.65 && prev) g = prev as Uint8Array<ArrayBuffer>; // the whole frame changed (camera move, flash): reuse the last good shape
+    prev = g;
+    const m = Buffer.alloc(N);
+    for (let y = 0; y < h2; y++) for (let x = 0; x < w2; x++) {
+      const i = y * w2 + x;
+      if (!g[((y / q) | 0) * w + ((x / q) | 0)]) continue;
+      if (stillText[i] && isText(raw[i * 3], raw[i * 3 + 1], raw[i * 3 + 2])) continue; // a letter drawn over the person: keep the original (with its animation)
+      m[i] = 255;
+    }
+    fs.writeFileSync(path.join(outDir, `${String(fi + 1).padStart(5, "0")}.png`), await sharp(m, { raw: { width: w2, height: h2, channels: 1 } }).blur(1.2).png().toBuffer());
+  }
 }

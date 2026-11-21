@@ -168,6 +168,7 @@ export function ReadyContent({ customerId, connected, postingTimes }: { customer
                           <div><label className="label" htmlFor={`rm-${it.id}`}>How</label>
                             <select id={`rm-${it.id}`} name="mode" className="field py-1.5">
                               {it.type === "reel" ? (<>
+                                <option value="video_remove">Remove a person or object: only their shape is replaced, all text and the audio stay</option>
                                 <option value="video_cut">Cut out: remove the parts the prompt is about, picture and sound (shorter video)</option>
                                 <option value="video_edit">Edit this video: change only the parts the prompt is about (keeps the rest and the audio)</option>
                                 <option value="video_frame">New 8-second video starting from the current video’s first frame</option>
