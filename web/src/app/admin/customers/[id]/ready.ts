@@ -202,7 +202,7 @@ export async function adminReadyRemake(fd: FormData) {
   }
   const opts = { prompt, mode, refs, slide: Number(fd.get("slide") || 1), seconds: Number(fd.get("seconds") || 8), audio: fd.get("audio") === "1", logo: fd.get("logo") === "1", recaption: fd.get("recaption") === "1" };
   if (item.status !== "ready_draft") await pullFromMeta(item.id, item.customerId);
-  db.update(schema.contentItems).set({ status: "ready_draft", error: mode === "video_edit" ? "Remaking: finding the parts to change, then re-filming them (5–15 minutes)…" : mode.startsWith("video") ? "Remaking: filming with Veo (2–5 minutes)…" : "Remaking: new image (under a minute)…", updatedAt: new Date() }).where(eq(schema.contentItems.id, item.id)).run();
+  db.update(schema.contentItems).set({ status: "ready_draft", error: mode === "video_cut" ? "Remaking: finding the parts to cut out (1–5 minutes)…" : mode === "video_edit" ? "Remaking: finding the parts to change, then re-filming them (5–15 minutes)…" : mode.startsWith("video") ? "Remaking: filming with Veo (2–5 minutes)…" : "Remaking: new image (under a minute)…", updatedAt: new Date() }).where(eq(schema.contentItems.id, item.id)).run();
   enqueue("ready_remake", { itemId: item.id, opts }, { customerId: item.customerId });
   back(item.customerId);
 }

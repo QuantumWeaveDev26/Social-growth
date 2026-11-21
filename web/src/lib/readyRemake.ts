@@ -19,7 +19,7 @@ import { READY_PLAN } from "./ready";
 
 const run = promisify(execFile);
 type Item = typeof schema.contentItems.$inferSelect;
-export type RemakeMode = "edit" | "new" | "video_frame" | "video_new" | "video_edit";
+export type RemakeMode = "edit" | "new" | "video_frame" | "video_new" | "video_edit" | "video_cut";
 export type RemakeOpts = { prompt: string; mode: RemakeMode; slide?: number; seconds?: number; audio?: boolean; logo?: boolean; recaption?: boolean; refs?: string[] };
 export type Version = { media: string[]; at: string; prompt?: string; mode?: string };
 
@@ -83,6 +83,19 @@ export async function remakeReady(itemId: string, o: RemakeOpts) {
   let next = [...media];
   const { geminiImage, imageToVideo } = await import("./veo");
   const refs = await Promise.all((o.refs || []).filter((r) => fs.existsSync(absPath(r))).map((r) => sharp(absPath(r)).resize(1024, 1024, { fit: "inside" }).jpeg({ quality: 88 }).toBuffer()));
+
+  if (o.mode === "video_cut") {
+    if (item.type !== "reel") throw new Error("“Cut out” is for reels");
+    const brief = JSON.parse(item.brief || "{}");
+    const last = Array.isArray(brief.versions) ? brief.versions[brief.versions.length - 1] : null;
+    // right after an "Edit this video", cut exactly the ranges it re-filmed; otherwise find them from the prompt
+    const known: { start: number; end: number }[] | null = last?.mode === "video_edit" && Array.isArray(brief.lastEdit) && brief.lastEdit.length ? brief.lastEdit : null;
+    const r = await cutVideo(item, absPath(media[0]), o.prompt, refs, known, `${dir}/reel-v${n}.mp4`);
+    const fresh = db.select().from(schema.contentItems).where(eq(schema.contentItems.id, itemId)).get()!;
+    const upd = saveVersion(fresh, [r.path], { prompt: o.prompt, mode: o.mode }, { autoSchedule: false, lastEdit: r.segments });
+    db.update(schema.contentItems).set({ ...upd, type: "reel", error: r.segments.length ? null : "Nothing matched the instruction, so the video is unchanged", costUsd: (fresh.costUsd || 0) + r.costUsd, updatedAt: new Date() }).where(eq(schema.contentItems.id, itemId)).run();
+    return r.costUsd;
+  }
 
   if (o.mode === "video_edit") {
     if (item.type !== "reel") throw new Error("“Edit this video” is for reels");
@@ -164,6 +177,80 @@ export async function replaceMedia(item: Item, files: File[]) {
   db.update(schema.contentItems).set({ ...upd, type: out[0].match(/\.(mp4|mov)$/) ? "reel" : "post", updatedAt: new Date() }).where(eq(schema.contentItems.id, item.id)).run();
 }
 
+/** Gemini finds the time ranges of a video that an instruction is about (frames every ~0.5 s + reference images). */
+async function planSegments(item: Item, file: string, info: Awaited<ReturnType<typeof probe>>, instruction: string, refs: Buffer[], tmp: string) {
+  const f = await ff();
+  let cost = 0;
+    // 1. sample frames
+    const progress = (msg: string) => db.update(schema.contentItems).set({ error: `Remaking: ${msg}`, updatedAt: new Date() }).where(eq(schema.contentItems.id, item.id)).run();
+    progress("step 1 of 3, looking through the video for the parts to change…");
+    const step = Math.max(0.5, info.dur / 48); // at most ~48 frames: enough to find every shot, quick for Gemini
+    const times: number[] = [];
+    for (let t = 0; t < info.dur - 0.05; t += step) times.push(Number(t.toFixed(2)));
+    const frames: Buffer[] = [];
+    for (const [i, t] of times.entries()) {
+      const o = path.join(tmp, `s${i}.jpg`);
+      await run(f.bin, ["-v", "error", "-y", "-ss", String(t), "-i", file, "-frames:v", "1", "-vf", "scale=320:-2", "-q:v", "6", o], { env: f.env, timeout: 60_000 }).catch(() => null);
+      frames.push(fs.existsSync(o) ? fs.readFileSync(o) : Buffer.alloc(0));
+    }
+    const { geminiJsonParts } = await import("./veo");
+    const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [];
+    if (refs.length) { parts.push({ text: "REFERENCE IMAGES from the agency:" }); refs.forEach((b) => parts.push({ inlineData: { mimeType: "image/jpeg", data: b.toString("base64") } })); }
+    parts.push({ text: `INSTRUCTION: ${instruction}\n\nThe video is ${info.dur.toFixed(1)} s long. Frames follow, each labelled with its time.` });
+    frames.forEach((b, i) => { if (b.length) { parts.push({ text: `t=${times[i]}s` }); parts.push({ inlineData: { mimeType: "image/jpeg", data: b.toString("base64") } }); } });
+    const sys = `You are a video editor. Find every time range of the video that must change to follow the INSTRUCTION (for example every shot where a given person is visible, including name titles or captions about them). Be precise and complete: include the whole shot from its first to its last frame. Leave everything else alone.
+For each range give:
+- frame_prompt: an instruction for an image editor working on a still frame from that range: what to remove or change, what to fill it with so it looks natural (continue the real background), and any on-screen text to remove because it refers to what is removed. Keep the logo, colours, lighting and everything else.
+- motion: one sentence describing the camera movement and natural motion of that shot so it can be re-filmed (e.g. "slow push-in, leaves moving in a light breeze").
+Return ONLY JSON: {"segments":[{"start":0.0,"end":2.5,"frame_prompt":"...","motion":"..."}]} with times in seconds. Return {"segments":[]} if nothing needs to change.`;
+    // the frames are many images in one request: give Gemini up to 8 minutes, and try once more if it times out
+    let r: { text: string; costUsd: number };
+    try { r = await geminiJsonParts(sys, parts, process.env.VIDEO_EDIT_MODEL || undefined, 480_000); }
+    catch (e) { console.error("video edit plan, retrying:", e instanceof Error ? e.message : e); r = await geminiJsonParts(sys, parts, process.env.VIDEO_EDIT_MODEL || undefined, 480_000); }
+    cost += r.costUsd;
+    let segs: Segment[] = [];
+    try { segs = (JSON.parse(r.text.replace(/^```json|```$/g, "")).segments || []) as Segment[]; } catch { throw new Error("Couldn’t read the edit plan"); }
+    // tidy: pad to the sampling step, clamp, merge overlaps
+    segs = segs.map((s) => ({ ...s, start: Math.max(0, Number(s.start) - step / 2), end: Math.min(info.dur, Number(s.end) + step / 2) })).filter((s) => s.end - s.start > 0.2).sort((a, b) => a.start - b.start);
+    const merged: Segment[] = [];
+    for (const s of segs) { const last = merged[merged.length - 1]; if (last && s.start <= last.end + 0.3) last.end = Math.max(last.end, s.end); else merged.push({ ...s }); }
+  return { segments: merged, step, costUsd: cost };
+}
+
+/** Removes the ranges the instruction is about (picture and sound together), so the reel gets shorter. */
+export async function cutVideo(item: Item, file: string, instruction: string, refs: Buffer[], known: { start: number; end: number }[] | null, outRel: string) {
+  const f = await ff();
+  const info = await probe(file);
+  if (!info.dur) throw new Error("Couldn’t read the video");
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "vc-"));
+  let cost = 0;
+  try {
+    let segs: { start: number; end: number }[];
+    if (known) segs = known.map((s) => ({ start: Math.max(0, s.start), end: Math.min(info.dur, s.end) }));
+    else { const p = await planSegments(item, file, info, instruction, refs, tmp); cost += p.costUsd; segs = p.segments; }
+    if (!segs.length) return { path: saveFile(outRel, fs.readFileSync(file)), segments: [], costUsd: cost };
+    db.update(schema.contentItems).set({ error: "Remaking: cutting the video…", updatedAt: new Date() }).where(eq(schema.contentItems.id, item.id)).run();
+    const keep: [number, number][] = [];
+    let cursor = 0;
+    for (const s of segs.sort((a, b) => a.start - b.start)) { if (s.start - cursor > 0.1) keep.push([cursor, s.start]); cursor = Math.max(cursor, s.end); }
+    if (info.dur - cursor > 0.1) keep.push([cursor, info.dur]);
+    if (!keep.length) throw new Error("That would cut the whole video");
+    const W = info.w - (info.w % 2), H = info.h - (info.h % 2);
+    const vf = `scale=${W}:${H}${f.full ? `,fps=${info.fps}` : ""},format=yuv420p`;
+    const pieces: string[] = [];
+    for (const [i, [a, b]] of keep.entries()) {
+      const o = path.join(tmp, `k${i}.mp4`);
+      const fade = f.full && info.audio ? ["-af", `afade=t=in:d=0.04,afade=t=out:st=${Math.max(0, b - a - 0.06).toFixed(3)}:d=0.06`] : [];
+      await run(f.bin, ["-v", "error", "-y", "-ss", a.toFixed(3), "-t", (b - a).toFixed(3), "-i", file, "-vf", vf, ...fade, "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", ...(info.audio ? ["-c:a", "aac", "-b:a", "192k", "-ar", "48000"] : ["-an"]), "-video_track_timescale", "90000", o], { env: f.env, timeout: 300_000 });
+      pieces.push(o);
+    }
+    fs.writeFileSync(path.join(tmp, "list.txt"), pieces.map((p) => `file '${p}'`).join("\n"));
+    const out = path.join(tmp, "out.mp4");
+    await run(f.bin, ["-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", path.join(tmp, "list.txt"), "-c", "copy", "-movflags", "+faststart", out], { env: f.env, timeout: 300_000 });
+    return { path: saveFile(outRel, fs.readFileSync(out)), segments: segs.map((s) => ({ start: Number(s.start.toFixed(2)), end: Number(s.end.toFixed(2)), change: "cut" })), costUsd: cost };
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+}
+
 // ---------------------------------------------------------------- edit an existing video
 /** A full ffmpeg (Debian package in the image) when present; Remotion's trimmed build otherwise. */
 async function ff() {
@@ -202,39 +289,12 @@ export async function editVideo(item: Item, file: string, instruction: string, r
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "ve-"));
   let cost = 0;
   try {
-    // 1. sample frames
     const progress = (msg: string) => db.update(schema.contentItems).set({ error: `Remaking: ${msg}`, updatedAt: new Date() }).where(eq(schema.contentItems.id, item.id)).run();
-    progress("step 1 of 3, looking through the video for the parts to change…");
-    const step = Math.max(0.5, info.dur / 48); // at most ~48 frames: enough to find every shot, quick for Gemini
-    const times: number[] = [];
-    for (let t = 0; t < info.dur - 0.05; t += step) times.push(Number(t.toFixed(2)));
-    const frames: Buffer[] = [];
-    for (const [i, t] of times.entries()) {
-      const o = path.join(tmp, `s${i}.jpg`);
-      await run(f.bin, ["-v", "error", "-y", "-ss", String(t), "-i", file, "-frames:v", "1", "-vf", "scale=320:-2", "-q:v", "6", o], { env: f.env, timeout: 60_000 }).catch(() => null);
-      frames.push(fs.existsSync(o) ? fs.readFileSync(o) : Buffer.alloc(0));
-    }
-    const { geminiJsonParts, geminiImage, imageToVideo } = await import("./veo");
-    const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [];
-    if (refs.length) { parts.push({ text: "REFERENCE IMAGES from the agency:" }); refs.forEach((b) => parts.push({ inlineData: { mimeType: "image/jpeg", data: b.toString("base64") } })); }
-    parts.push({ text: `INSTRUCTION: ${instruction}\n\nThe video is ${info.dur.toFixed(1)} s long. Frames follow, each labelled with its time.` });
-    frames.forEach((b, i) => { if (b.length) { parts.push({ text: `t=${times[i]}s` }); parts.push({ inlineData: { mimeType: "image/jpeg", data: b.toString("base64") } }); } });
-    const sys = `You are a video editor. Find every time range of the video that must change to follow the INSTRUCTION (for example every shot where a given person is visible, including name titles or captions about them). Be precise and complete: include the whole shot from its first to its last frame. Leave everything else alone.
-For each range give:
-- frame_prompt: an instruction for an image editor working on a still frame from that range: what to remove or change, what to fill it with so it looks natural (continue the real background), and any on-screen text to remove because it refers to what is removed. Keep the logo, colours, lighting and everything else.
-- motion: one sentence describing the camera movement and natural motion of that shot so it can be re-filmed (e.g. "slow push-in, leaves moving in a light breeze").
-Return ONLY JSON: {"segments":[{"start":0.0,"end":2.5,"frame_prompt":"...","motion":"..."}]} with times in seconds. Return {"segments":[]} if nothing needs to change.`;
-    // the frames are many images in one request: give Gemini up to 8 minutes, and try once more if it times out
-    let r: { text: string; costUsd: number };
-    try { r = await geminiJsonParts(sys, parts, process.env.VIDEO_EDIT_MODEL || undefined, 480_000); }
-    catch (e) { console.error("video edit plan, retrying:", e instanceof Error ? e.message : e); r = await geminiJsonParts(sys, parts, process.env.VIDEO_EDIT_MODEL || undefined, 480_000); }
-    cost += r.costUsd;
-    let segs: Segment[] = [];
-    try { segs = (JSON.parse(r.text.replace(/^```json|```$/g, "")).segments || []) as Segment[]; } catch { throw new Error("Couldn’t read the edit plan"); }
-    // tidy: pad to the sampling step, clamp, merge overlaps
-    segs = segs.map((s) => ({ ...s, start: Math.max(0, Number(s.start) - step / 2), end: Math.min(info.dur, Number(s.end) + step / 2) })).filter((s) => s.end - s.start > 0.2).sort((a, b) => a.start - b.start);
-    const merged: Segment[] = [];
-    for (const s of segs) { const last = merged[merged.length - 1]; if (last && s.start <= last.end + 0.3) last.end = Math.max(last.end, s.end); else merged.push({ ...s }); }
+    const plan = await planSegments(item, file, info, instruction, refs, tmp);
+    cost += plan.costUsd;
+    const merged = plan.segments, step = plan.step;
+    void step;
+    const { geminiImage, imageToVideo } = await import("./veo");
     if (!merged.length) { return { path: saveFile(outRel, fs.readFileSync(file)), segments: [], costUsd: cost }; }
 
     // 2. new footage for each range (Veo makes 4/6/8 s clips; longer ranges are filmed in pieces)
